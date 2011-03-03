@@ -38,7 +38,8 @@ No, thanks for asking. But let me know if you're having problems and I'll see wh
 
 == Screenshots ==
 
-= Coming Soon =
+1. In the Edit subpage for media locate the box title "Edit Post Thumbnails", and select the image size you wish to modify.
+2. Crop the image as you see fit and click "Save".
 
 == Changelog ==
 = 0.1 =
