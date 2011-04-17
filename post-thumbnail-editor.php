@@ -1,11 +1,10 @@
 <?php
 /* Plugin name: Post Thumbnail Editor
-   Plugin URI: http://github.com/sewpafly/post-thumbnail-editor
+   Plugin URI: http://wordpress.org/extend/plugins/post-thumbnail-editor/
    Author: sewpafly
-   Author URI: http://sewpafly.github.com/
-   Version: 0.1.1
+   Author URI: http://sewpafly.github.com/post-thumbnail-editor
+   Version: 0.2
    Description: Individually manage your post thumbnails
-   Max WP Version: 3.1
 
     LICENSE
 
@@ -32,6 +31,7 @@
  */
 define( PTE_PLUGINURL, plugins_url(basename( dirname(__FILE__))) . "/");
 define( PTE_PLUGINPATH, dirname(__FILE__) . "/");
+define( PTE_VERSION, "0.2");
 
 /*
  * Put Hooks and immediate hook functions in this file
@@ -41,8 +41,11 @@ define( PTE_PLUGINPATH, dirname(__FILE__) . "/");
 function pte_admin_media_styles(){
    wp_enqueue_style('fancybox',
       PTE_PLUGINURL . 'apps/fancybox/jquery.fancybox-1.3.4.css');
-   wp_enqueue_style('pte',
-      PTE_PLUGINURL . 'css/pte.css');
+   wp_enqueue_style( 'pte'
+       , PTE_PLUGINURL . 'css/pte.css'
+       , false
+       , PTE_VERSION
+   );
 }
 
 function pte_admin_media_scripts(){
@@ -51,9 +54,10 @@ function pte_admin_media_scripts(){
       PTE_PLUGINURL . 'apps/fancybox/jquery.fancybox-1.3.4.min.js',
       array('jquery')
    );
-   wp_enqueue_script('pte',
-      PTE_PLUGINURL . 'js/pte_admin_media.js',
-      array('jquery')
+   wp_enqueue_script( 'pte'
+       , PTE_PLUGINURL . 'js/pte_admin_media.js'
+       , array('jquery')
+       , PTE_VERSION
    );
 }
 
