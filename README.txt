@@ -62,6 +62,9 @@ Not yet, Coming in the next release (0.3). However, I'm hopeful that any images 
 
 == Upgrade Notice ==
 
+= 0.2.1 =
+Fixed an error with older PHP installs
+
 = 0.2 =
 Change thumbnails aspect ratio (only works for medium/large. Will work for thumbnail if the crop checkbox isn't checked under Media Settings)
 
