@@ -1,306 +1,580 @@
 <?php
 
-function pte_json_encode($mixed){
-   if ( function_exists('json_encode') ){
-      die( json_encode($mixed) );
-   }
-   else {
-      pte_error( "json_encode not available, upgrade your php" );
-   }
+function pte_require_json() {
+	if ( function_exists( 'ob_start' ) ){
+		ob_start();
+	}
 }
 
-/**
- * Validation functions
- *
- * Return if the GET/POST data is valid
- * pte-error/die if invalid
+/*
+ * This is used to output JSON
  */
-function validate_image_data_inputs($id, $size){
-   if ( !is_numeric( $id ) )
-      pte_error("Parameter 'id' is not numeric");
+function pte_json_encode($mixed = null){
+	global $pte_errors;
+	// If a buffer was started this will check for any residual output
+	// and add to the existing errors.
+	if ( function_exists( 'ob_get_flush' ) ){
+		$buffer = ob_get_clean();
+		if ( isset( $buffer ) && strlen( $buffer ) > 0 ){
+			pte_add_error("Buffered output: {$buffer}");
+		}
+	}
 
-   $fullsizepath = get_attached_file( $id );
-   $path_information = image_get_intermediate_size($id, $size);
+	if ( ! function_exists('json_encode') ){
+		pte_add_error( "json_encode not available, upgrade your php" );
+		$messages = implode( "\r\n", $pte_errors );
+		die("{\"error\":\"{$messages}\"}");
+	}
 
-   $size_information = pte_get_alternate_sizes(true);
-   if (! array_key_exists( $size, $size_information ) ){
-      pte_error("Invalid size: {$size}");
-   }
-   return compact( 'fullsizepath'
-      , 'path_information'
-      , 'size_information' 
-   );
+	if ( ! isset($mixed) ){
+		$mixed = array();
+	}
+	else if ( ! is_array( $mixed ) ){
+		$mixed = array($mixed);
+	}
+
+	if ( count( $pte_errors ) > 0 ){
+		$mixed = array_merge_recursive( $mixed, array( 'error' => $pte_errors ) );
+	}
+
+	print( json_encode($mixed) );
+	return true;
 }
 
-function validate_resize_inputs( $id, $thumb_size, $x, $y, $w, $h ){
-   // Verifies that the user has proper access and intent
-   check_ajax_referer("pte-{$id}-{$thumb_size}");
-
-   //Check that the parameters are digits
-   if ( !( is_numeric($id) &&
-        is_numeric($x) &&
-        is_numeric($y) &&
-        is_numeric($w) &&
-        is_numeric($h) ) ){
-           pte_error("One of 'id', 'x', 'y', 'w', or 'h' is not numeric");
-        }
-
-   // Check the POST
-   $id = (int) $id;
-   if ( !$post =& get_post( $id ) )
-      pte_error("Invalid id: {$id}");
-
-   $file = get_attached_file( $id );
-   $image = wp_load_image( $file );
-
-   $size_information = pte_get_alternate_sizes(true);
-   if (! array_key_exists( $thumb_size, $size_information ) ){
-      pte_error("Invalid size: {$thumb_size}");
-   }
-
-   if (! $path_information = image_get_intermediate_size($id, $thumb_size)){
-      pte_error("Invalid image: {$id} {$thumb_size}");
-   }
-
-   if ( !is_resource( $image ) )
-      pte_error("Error loading image");
-
-   $size = @getimagesize( $file );
-   if ( !$size )
-      pte_error("Could not read image size");
-
-   list($orig_w, $orig_h, $orig_type) = $size;
-
-   // Error checking that the src is big enough to go into dst?
-   if ( 
-      $x < 0 ||
-      $y < 0 ||
-      $x + $w > $orig_w ||
-      $y + $h > $orig_h ||
-      $w <= 0 || 
-      $h <= 0 ){
-      pte_error("Invalid input parameters: {$x} {$y} {$w} {$h}");
-   }
-   $array = compact('id'
-      , 'post'
-      , 'file'
-      , 'image'
-      , 'size_information'
-      , 'path_information'
-      , 'orig_w'
-      , 'orig_h'
-      , 'orig_type'
-   );
-   return $array;
-}
-/** END VALIDATION **/
-
-function pte_get_alternate_sizes($return_php = false){
-   global $_wp_additional_image_sizes;
-   $sizes = array();
-   foreach (get_intermediate_image_sizes() as $s){
-      if ( isset( $_wp_additional_image_sizes[$s]['width'] ) ) // For theme-added sizes
-         $width = intval( $_wp_additional_image_sizes[$s]['width'] );
-      else                                                     // For default sizes set in options
-         $width = get_option( "{$s}_size_w" );
-
-      if ( isset( $_wp_additional_image_sizes[$s]['height'] ) ) // For theme-added sizes
-         $height = intval( $_wp_additional_image_sizes[$s]['height'] );
-      else                                                      // For default sizes set in options
-         $height = get_option( "{$s}_size_h" );
-
-      if ( isset( $_wp_additional_image_sizes[$s]['crop'] ) ) // For theme-added sizes
-         $crop = intval( $_wp_additional_image_sizes[$s]['crop'] );
-      else                                                      // For default sizes set in options
-         $crop = get_option( "{$s}_crop" );
-      $sizes[$s] = array(
-         'width'  => $width,
-         'height' => $height,
-         'crop'   => $crop
-      );
-   }
-
-   if ( $return_php ) return $sizes;
-   pte_json_encode( array( 'sizes' => $sizes ) );
-}
-
-function pte_get_image_data($id, $size){
-
-   // Validate the inputs
-   // Create and return:
-   //    $fullsizepath
-   //    $path_information
-   //    $size_information 
-   extract( validate_image_data_inputs( $id, $size ) );
-
-   // Get/Create nonce
-   //   - This key grants limited 24 hour access to modify the attachment $id's $size
-   $nonce = wp_create_nonce("pte-{$id}-{$size}");
-
-   if ( $path_information && 
-      @file_exists(dirname($fullsizepath)."/".$path_information['file']))
-   {
-      $path_information['nonce'] = $nonce;
-      //$path_information['debug'] = "Finished without regenerating image";
-      pte_json_encode($path_information);
-   }
-
-   // We don't really care how it gets generated, just that it is...
-   // see ajax-thumbnail-rebuild plugin for inspiration
-   if ( FALSE !== $fullsizepath && @file_exists($fullsizepath) ) {
-      // Create the image and update the wordpress metadata
-      $resized = image_make_intermediate_size( $fullsizepath, 
-         $size_information[$size]['width'], 
-         $size_information[$size]['height'],
-         $size_information[$size]['crop']
-      );
-      if ($resized){
-         $metadata = wp_get_attachment_metadata($id);
-         $metadata['sizes'][$size] = $resized;
-         wp_update_attachment_metadata( $id, $metadata);
-      }
-   }
-
-   // Finish how we started
-   $path_information = image_get_intermediate_size($id, $size);
-   if ($path_information){
-      $path_information['nonce'] = $nonce;
-      pte_json_encode($path_information);
-   }
-   else {
-      //print("{\"error\":\"Couldn't find metadata for image: $id\"}");
-      pte_error("Couldn't find metadata for image");
-   }
-}
-
-function pte_error($message){
-   die("{\"error\":\"{$message}\"}");
-}
-
-/* 
- * See wordpress: wp-includes/media.php for image_resize
- *
- * TODO: Break into smaller pieces
- * TODO: Test saving POST META
+/*
+ * pte_json_error
  */
-function pte_resize_img($id, $thumb_size, $x, $y, $w, $h, $save = true){
-   // Check your inputs...
-   // Also creates and returns:
-   //    $post
-   //    $file
-   //    $image
-   //    $size_information
-   //    $path_information
-   //    $orig_w
-   //    $orig_h
-   //    $orig_type
-   //extract(validate_resize_inputs( $id, $thumb_size, $x, $y, $w, $h ));
-   $validation = validate_resize_inputs( $id, $thumb_size, $x, $y, $w, $h );
-   extract( $validation );
-
-   // Set the output (destination) information
-   $dst_x = 0;
-   $dst_y = 0;
-
-   // ==============================
-   // Get Destination width & height
-   // ==============================
-   // When the crop isn't set the biggest dimension is accurate, 
-   // but the other dimension is wrong
-   if ($size_information[$thumb_size]['crop']){
-      $dst_w = $size_information[$thumb_size]['width'];
-      $dst_h = $size_information[$thumb_size]['height'];
-   }
-   // Crop isn't set so the height / width should be based on the biggest side
-   // Filename changes
-   // Update wp_attachment_metadata with the correct file/width/height
-   else if ($w > $h){
-      $dst_w = $size_information[$thumb_size]['width'];
-      $dst_h = round( ($dst_w/$w) * $h, 0);
-   }
-   else {
-      $dst_h = $size_information[$thumb_size]['height'];
-      $dst_w = round( ($dst_h/$h) * $w, 0);
-   }
-   // ==============================
-
-
-   // ================
-   // Get the filename
-   // ================
-   // See image_resize function in wp-includes/media.php to follow the same conventions
-   $info = pathinfo($file);
-   $dir = $info['dirname'];
-   $ext = $info['extension'];
-   $name = wp_basename($file, ".$ext");
-   $suffix = "{$dst_w}x{$dst_h}-pte";
-   $destfilename = "{$dir}/{$name}-{$suffix}.{$ext}";
-   // ================
-
-   // Set the input information
-   $src_x = $x;
-   $src_y = $y;
-   $src_w = $w;
-   $src_h = $h;
-
-   // Now let's get down to business...
-   $newimage = wp_imagecreatetruecolor( $dst_w, $dst_h );
-
-   // Save the conversion data so if a batch script (a la ajax-thumbnail-rebuild)
-   // that we can find what the scale/crop area and rebuild using it.
-   if ($save){
-      $data = get_post_meta( $post->ID, PTE_POST_DATA, true );
-      $data[$thumb_size] = compact( 'dst_x', 'dst_y', 'dst_w', 'dst_h'
-                                  , 'src_x', 'src_y', 'src_w', 'src_h'
-      );
-      update_post_meta($post->ID, PTE_POST_DATA, $data);
-   }
-
-   imagecopyresampled( $newimage, $image
-       , $dst_x, $dst_y, $src_x, $src_y
-       , $dst_w, $dst_h, $src_w, $src_h );
-
-   // convert from full colors to index colors, like original PNG.
-   if ( IMAGETYPE_PNG == $orig_type && function_exists('imageistruecolor') && !imageistruecolor( $image ) )
-      imagetruecolortopalette( $newimage, false, imagecolorstotal( $image ) );
-
-   // we don't need the original in memory anymore
-   imagedestroy( $image );
-
-   if ( IMAGETYPE_GIF == $orig_type ) {
-      if ( !imagegif( $newimage, $destfilename ) )
-         //return new WP_Error('resize_path_invalid', __( 'Resize path invalid' ));
-         pte_error("Resize path invalid");
-   } 
-   elseif ( IMAGETYPE_PNG == $orig_type ) {
-      if ( !imagepng( $newimage, $destfilename ) )
-         //return new WP_Error('resize_path_invalid', __( 'Resize path invalid' ));
-         pte_error("Resize path invalid");
-   } 
-   else {
-      // all other formats are converted to jpg
-      //if ( !imagejpeg( $newimage, $destfilename, apply_filters( 'jpeg_quality', $jpeg_quality, 'image_resize' ) ) )
-      if ( !imagejpeg( $newimage, $destfilename, 90) )
-         //return new WP_Error('resize_path_invalid', __( 'Resize path invalid' ));
-         pte_error("Resize path invalid: " . $destfilename);
-   }
-
-   imagedestroy( $newimage );
-
-   // Set correct file permissions
-   $stat = stat( dirname( $destfilename ));
-   $perms = $stat['mode'] & 0000666; //same permissions as parent folder, strip off the executable bits
-   @ chmod( $destfilename, $perms );
-
-   // Update attachment metadata
-   $metadata = wp_get_attachment_metadata($id);
-   $metadata['sizes'][$thumb_size] = array( 'file' => "{$name}-{$suffix}.{$ext}"
-       , 'width' => $dst_w
-       , 'height' => $dst_h 
-   );
-   wp_update_attachment_metadata( $id, $metadata);
-   
-   $path_information = image_get_intermediate_size($id, $thumb_size);
-   pte_json_encode( array( "url" => $path_information['url'] ) );
+function pte_json_error($error){
+	pte_add_error( $error );
+	return pte_json_encode();
 }
 
+/*
+ * pte_add_error
+ */
+function pte_add_error($error){
+	global $pte_errors;
+	if ( ! isset( $pte_errors ) || ! is_array( $pte_errors ) ){
+		$pte_errors = array();
+	}
+
+	if ( !in_array( $error, $pte_errors ) ){
+		if ( is_string( $error ) ){
+			$pte_errors[] = $error;
+		}
+		else if ( is_array( $error ) ){
+			$pte_errors = array_merge( $error, $pte_errors );
+		}
+	}
+}
+
+/*
+ * pte_filter_sizes
+ *
+ * This is used by the get_sizes functions to determine which sizes to
+ * reduce to
+ */
+function pte_filter_sizes( $element ){
+	global $pte_sizes;
+	if ( is_array( $pte_sizes ) && !in_array( $element, $pte_sizes )
+	){
+		return false;
+	}
+	return true;
+}
+
+/*
+ * pte_get_alternate_sizes
+ *
+ * Creates an array of each thumbnail size and the corresponding data:
+ *   * height
+ *   * width
+ *   * crop boolean
+ *
+ * Thanks to the ajax_thumbnail_rebuild plugin
+ */
+function pte_get_alternate_sizes(){
+	//Put in some code to check if it's already been called...
+	global $_wp_additional_image_sizes, $pte_gas;
+	if ( !isset($pte_gas) ){
+		$pte_gas = array();
+		foreach (array_filter( get_intermediate_image_sizes(), 'pte_filter_sizes' ) as $s){
+			if ( isset( $_wp_additional_image_sizes[$s]['width'] ) ) // For theme-added sizes
+				$width = intval( $_wp_additional_image_sizes[$s]['width'] );
+			else                                                     // For default sizes set in options
+				$width = get_option( "{$s}_size_w" );
+
+			if ( isset( $_wp_additional_image_sizes[$s]['height'] ) ) // For theme-added sizes
+				$height = intval( $_wp_additional_image_sizes[$s]['height'] );
+			else                                                      // For default sizes set in options
+				$height = get_option( "{$s}_size_h" );
+
+			if ( isset( $_wp_additional_image_sizes[$s]['crop'] ) ) // For theme-added sizes
+				$crop = intval( $_wp_additional_image_sizes[$s]['crop'] );
+			else                                                      // For default sizes set in options
+				$crop = get_option( "{$s}_crop" );
+			$pte_gas[$s] = array(
+				'width'  => $width,
+				'height' => $height,
+				'crop'   => $crop
+			);
+		}
+	}
+	return $pte_gas;
+}
+
+/*
+ * pte_get_image_data
+ *
+ * Gets specific data for a given image (id) at a given size (size)
+ * Optionally can return the JSON value or PHP array
+ */
+function pte_get_image_data( $id, $size, $size_data ){
+
+	$fullsizepath = get_attached_file( $id );
+	$path_information = image_get_intermediate_size($id, $size);
+
+	if ( $path_information && 
+		@file_exists( dirname( $fullsizepath ) . DIRECTORY_SEPARATOR . $path_information['file'] )
+	){
+		//print_r( $path_information );
+		return $path_information;
+	}
+	//print("NOPE, no path information...");
+	//print_r($path_information);
+	//print("END PI");
+
+	// We don't really care how it gets generated, just that it is...
+	// see ajax-thumbnail-rebuild plugin for inspiration
+	if ( FALSE !== $fullsizepath && @file_exists($fullsizepath) ) {
+		// Create the image and update the wordpress metadata
+		$resized = image_make_intermediate_size( $fullsizepath, 
+			$size_data['width'], 
+			$size_data['height'],
+			$size_data['crop']
+		);
+		if ($resized){
+			$metadata = wp_get_attachment_metadata($id);
+			$metadata['sizes'][$size] = $resized;
+			wp_update_attachment_metadata( $id, $metadata);
+		}
+	}
+
+	// Finish how we started
+	$path_information = image_get_intermediate_size($id, $size);
+	if ($path_information){
+		return $path_information;
+	}
+	else {
+		pte_add_error( "Couldn't find or generate metadata for image: {$id}-{$size}" );
+	}
+	return false;
+}
+
+/*
+ * pte_get_all_alternate_size_information
+ *
+ * Gets all pertinent data describing the alternate sizes
+ */
+function pte_get_all_alternate_size_information( $id ){
+	$sizes = pte_get_alternate_sizes();
+	foreach ( $sizes as $size => &$info ){
+		$info['current'] = pte_get_image_data( $id, $size, $info );
+	}
+	return $sizes;
+}
+
+/*
+ * pte_launch
+ *
+ * Outputs the base HTML needed to display and transform the inages
+ *
+ * Requires post id as $_GET['id']
+ */
+function pte_launch(){
+	//wp_register_script( 'jquery-tmpl'
+	//   , PTE_PLUGINURL . 'apps/jquery-tmpl/jquery.tmpl.min.js'
+	//   , array('jquery')
+	//   , '1.0.0pre'
+	//);
+	if ( PTE_DEBUG ) {
+		wp_enqueue_script( 'pte'
+			, PTE_PLUGINURL . 'js/pte.full.js'
+			, array('jquery','imgareaselect')
+			, PTE_VERSION
+		);
+		wp_enqueue_style( 'pte'
+			, PTE_PLUGINURL . 'css/pte.css'
+			, array('imgareaselect')
+			, PTE_VERSION
+		);
+	}
+	else { // Minified versions
+		wp_enqueue_script( 'pte'
+			, PTE_PLUGINURL . 'js/pte.full.min.js'
+			, array('jquery','imgareaselect')
+			, PTE_VERSION
+		);
+		wp_enqueue_style( 'pte'
+			, PTE_PLUGINURL . 'css/pte.min.css'
+			, array('imgareaselect')
+			, PTE_VERSION
+		);
+	}
+
+	$id = pte_check_id((int) $_GET['id']);
+
+	$size_information = pte_get_all_alternate_size_information( $id );
+
+	// Get the information needed for image preview 
+	//   (See wp-admin/includes/image-edit.php)
+	$nonce = wp_create_nonce("image_editor-$id");
+	$meta = wp_get_attachment_metadata($id);
+
+	if ( is_array($meta) && isset($meta['width']) )
+		$big = max( $meta['width'], $meta['height'] );
+
+	$sizer = $big > 400 ? 400 / $big : 1;
+
+	require( PTE_PLUGINPATH . "html/pte.html" );
+}
+
+function pte_check_id( $id ){
+	if ( !$post =& get_post( $id ) ){
+		pte_add_error( "Invalid id: {$id}" );
+		return false;
+	}
+	if ( !current_user_can( 'edit_post', $id ) ){
+		pte_add_error( "User does not have permission to edit this item" );
+		return false;
+	}
+	return $id;
+}
+
+function pte_check_int( $int ){
+	if (! is_numeric( $int ) ){
+		pte_add_error("PARAM not numeric: '{$int}'");
+		return false;
+	}
+	return $int;
+}
+
+/*
+ * Get Destination width & height
+ * ==============================
+ * When the crop isn't set:
+ *    the size information for the biggest dimension is accurate, 
+ *    but the other dimension is wrong
+ */
+function pte_get_width_height( $size_information, $w, $h ){
+	if ( $size_information['crop'] == 1 ){
+		$dst_w = $size_information['width'];
+		$dst_h = $size_information['height'];
+	}
+	// Crop isn't set so the height / width should be based on the biggest side
+	else if ($w > $h){
+		$dst_w = $size_information['width'];
+		$dst_h = round( ($dst_w/$w) * $h, 0);
+	}
+	else {
+		$dst_h = $size_information['height'];
+		$dst_w = round( ($dst_h/$h) * $w, 0);
+	}
+	$return = compact( "dst_w", "dst_h" );
+	return $return;
+}
+
+/*
+ * ================
+ * Get the filename
+ * ================
+ * See image_resize function in wp-includes/media.php to follow the same conventions
+ *  - Check if the file exists
+ */
+function pte_generate_filename( $file, $w, $h ){
+	$info   = pathinfo( $file );
+	$ext    = $info['extension'];
+	$name   = wp_basename( $file, ".$ext" );
+	$suffix = "{$w}x{$h}";
+	//print_r( compact( "file", "info", "ext", "name", "suffix" ) );
+	return "{$name}-{$suffix}.{$ext}";
+}
+
+/*
+ * pte_create_image
+ */
+function pte_create_image($original_image, $type,
+	$dst_x, $dst_y, $dst_w, $dst_h,
+	$src_x, $src_y, $src_w, $src_h )
+{
+	$new_image = wp_imagecreatetruecolor( $dst_w, $dst_h );
+
+	//print_r( compact( "original_image", 'type', 'dst_x', 'dst_y', 'dst_w', 'dst_h',
+	//   'src_x','src_y','src_w','src_h' ) );
+
+	imagecopyresampled( $new_image, $original_image,
+		$dst_x, $dst_y, $src_x, $src_y,
+		$dst_w, $dst_h, $src_w, $src_h 
+	);
+
+	// convert from full colors to index colors, like original PNG.
+	if ( IMAGETYPE_PNG == $type && 
+		function_exists('imageistruecolor') && 
+		!imageistruecolor( $original_image ) 
+		){
+			imagetruecolortopalette( $newimage, false, imagecolorstotal( $original_image ) );
+		}
+
+	return $new_image;
+}
+
+function pte_write_image( $image, $orig_type, $destfilename ){
+	$dir = dirname( $destfilename );
+	if ( ! is_dir( $dir ) ){
+		if ( ! mkdir( $dir, 0777, true ) ){
+			pte_add_error("Error creating directory: {$dir}");
+		}
+	}
+
+	if ( IMAGETYPE_GIF == $orig_type ) {
+		if ( !imagegif( $image, $destfilename ) ){
+			pte_add_error("Resize path invalid");
+			return false;
+		}
+	} 
+	elseif ( IMAGETYPE_PNG == $orig_type ) {
+		if ( !imagepng( $image, $destfilename ) ){
+			pte_add_error("Resize path invalid");
+			return false;
+		}
+	} 
+	else {
+		// all other formats are converted to jpg
+		if ( !imagejpeg( $image, $destfilename, 90) ){
+			pte_add_error("Resize path invalid: " . $destfilename);
+			return false;
+		}
+	}
+
+	imagedestroy( $image );
+
+	// Set correct file permissions
+	$stat = stat( dirname( $destfilename ));
+	$perms = $stat['mode'] & 0000666; //same permissions as parent folder, strip off the executable bits
+	@ chmod( $destfilename, $perms );
+
+	return true;
+}
+
+
+/*
+ * resize_images
+ *
+ * Take an array of sizes along with the associated resize data (w/h/x/y) 
+ * and save the images to a temp directory
+ * 
+ * OUTPUT: JSON object 'size: url'
+ */
+function pte_resize_images(){
+	global $pte_sizes;
+
+	// Require JSON output
+	pte_require_json();
+
+	$id = pte_check_id( $_GET['id'] );
+	$w  = pte_check_int( $_GET['w'] );
+	$h  = pte_check_int( $_GET['h'] );
+	$x  = pte_check_int( $_GET['x'] );
+	$y  = pte_check_int( $_GET['y'] );
+
+	if ( $id === false
+		|| $w === false
+		|| $h === false
+		|| $x === false
+		|| $y === false
+	){
+		return pte_json_error( "ResizeImages initialization failed: '{$id}-{$w}-{$h}-{$x}-{$y}'" );
+	}
+
+	// Get the sizes to process
+	$pte_sizes      = $_GET['pte-sizes'];
+	$sizes          = pte_get_all_alternate_size_information( $id );
+
+	// The following information is common to all sizes
+	// *** common-info
+	$dst_x          = 0;
+	$dst_y          = 0;
+	$original_file  = get_attached_file( $id );
+	$original_image = wp_load_image( $original_file );
+	$original_size  = @getimagesize( $original_file );
+	$uploads 	    = wp_upload_dir();
+	$PTE_TMP_DIR    = $uploads['basedir'] . DIRECTORY_SEPARATOR . "ptetmp" . DIRECTORY_SEPARATOR;
+	$PTE_TMP_URL    = $uploads['baseurl'] . "/ptetmp/";
+
+	if ( !$original_size ){
+		return pte_json_error("Could not read image size");
+	}
+
+	list( $orig_w, $orig_h, $orig_type ) = $original_size;
+	// *** End common-info
+
+	foreach ( $sizes as $size => $data ){
+		// Get all the data needed to run image_create
+		//
+		//	$dst_w, $dst_h 
+		extract( pte_get_width_height( $data, $w, $h ) );
+		//
+		// Set the directory
+		$basename = pte_generate_filename( $original_file, $dst_w, $dst_h );
+		// Set the file and URL's - defines set in pte_ajax
+		$tmpfile  = "{$PTE_TMP_DIR}{$id}" . DIRECTORY_SEPARATOR . "{$basename}";
+		$tmpurl   = "{$PTE_TMP_URL}{$id}/{$basename}";
+
+		// === CREATE IMAGE ===================
+		$image = pte_create_image( $original_image, $orig_type,
+			$dst_x, $dst_y, $dst_w, $dst_h,
+			$x,     $y,     $w,     $h );
+
+		if ( ! isset( $image ) ){
+			pte_add_error( "Error creating image: {$size}" );
+			continue;
+		}
+
+		if ( ! pte_write_image( $image, $orig_type, $tmpfile ) ){
+			pte_add_error( "Error writing image: {$size} to '{$tmpfile}'" );
+			continue;
+		}
+		// === END CREATE IMAGE ===============
+
+		// URL: wp_upload_dir => base_url/subdir + /basename of $tmpfile
+		// This is for the output
+		$thumbnails[$size]['url'] = $tmpurl;
+		$thumbnails[$size]['file'] = basename( $tmpfile );
+	}
+
+	// we don't need the original in memory anymore
+	imagedestroy( $original_image );
+
+	// Did you process anything?
+	if ( count( $thumbnails ) < 1 ){
+		return pte_json_error("No images processed");
+	}
+
+	return pte_json_encode( array( 
+		'thumbnails'        => $thumbnails,
+		'pte-nonce'         => wp_create_nonce( "pte-{$id}" ),
+		'pte-delete-nonce'  => wp_create_nonce( "pte-delete-{$id}" )
+	) );
+}
+
+/*
+ * pte_confirm_images
+ *
+ * Take an array of image sizes, an ID and a nonce and then move the confirmed images
+ * to the official position and update metadata...
+ *
+ * Clean up and return error/success information...
+ */
+function pte_confirm_images(){
+	global $pte_sizes, $pte_errors;
+
+	// Require JSON output
+	pte_require_json();
+
+	$id = pte_check_id( (int) $_GET['id'] );
+	if ( $id === false ){
+		return pte_json_error( "ID invalid: {$id}" );
+	}
+
+	// Check nonce
+	if ( !check_ajax_referer( "pte-{$id}", 'pte-nonce', false ) ){
+		return pte_json_error( "CSRF Check failed" );
+	}
+
+	// Get the available sizes
+	if ( is_array( $_GET['pte-confirm'] ) ){
+		$pte_sizes = array_keys( $_GET['pte-confirm'] );
+		$sizes = pte_get_all_alternate_size_information( $id );
+	}
+	else {
+		return pte_json_error( "Invalid Parameters: can't find sizes" );
+	}
+	// === END INITIALIZATION ================================
+
+	// Foreach size:
+	//    Move good image
+	//    Update metadata
+	//    Delete old image
+	// Remove PTE/$id directory
+	$uploads = wp_upload_dir();
+	$PTE_TMP_DIR = $uploads['basedir'] . DIRECTORY_SEPARATOR . "ptetmp" . DIRECTORY_SEPARATOR . $id;
+	foreach ( $sizes as $size => $data ){
+		// Make sure we're only moving our files
+		$good_file = $PTE_TMP_DIR
+			. DIRECTORY_SEPARATOR
+			. basename( $_GET['pte-confirm'][$size] );
+
+		if ( ! ( isset( $good_file ) && file_exists( $good_file ) ) ){
+			return pte_json_error("FILE is invalid: {$good_file}");
+		}
+
+		$dir = dirname( get_attached_file( $id ) );
+		$new_file = $dir
+			. DIRECTORY_SEPARATOR
+			. basename( $good_file );
+		if ( isset( $data['file'] ) ){
+			$old_file = $dir
+				. DIRECTORY_SEPARATOR
+				. $data['file'];
+		}
+
+		// Move good image
+		rename( $good_file, $new_file );
+
+		// Update metadata
+		$image_dimensions  = @getimagesize( $new_file );
+		list( $w, $h, $type ) = $image_dimensions;
+		//print("IMAGE DIMENSIONS...");
+		//print_r( $image_dimensions );
+		$metadata = wp_get_attachment_metadata( $id );
+		$metadata['sizes'][$size] = array( 
+			'file' => basename( $new_file ),
+			'width' => $w,
+			'height' => $h 
+		);
+		//print_r($metadata['sizes'][$size]);
+		wp_update_attachment_metadata( $id, $metadata);
+
+		// Delete/unlink old file
+		if ( isset( $old_file ) 
+			&& $old_file !== $new_file 
+			&& file_exists( $old_file ) )
+		{
+			//print( "OLD FILE: {$old_file}" );
+			unlink( $old_file );
+		}
+	}
+	// Delete tmpdir
+	rmdir( $PTE_TMP_DIR );
+	return pte_json_encode( array( 'success' => "Yay!" ) );
+}
+
+function pte_delete_images()
+{
+	// Require JSON output
+	pte_require_json();
+
+	$id = pte_check_id( (int) $_GET['id'] );
+	if ( $id === false ){
+		return pte_json_error( "ID invalid: {$id}" );
+	}
+	// Check nonce
+	if ( !check_ajax_referer( "pte-delete-{$id}", 'pte-nonce', false ) ){
+		return pte_json_error( "CSRF Check failed" );
+	}
+	$uploads = wp_upload_dir();
+	$PTE_TMP_DIR = $uploads['basedir'] . DIRECTORY_SEPARATOR . "ptetmp" . DIRECTORY_SEPARATOR . $id;
+	// Delete tmpdir
+	unlink( $PTE_TMP_DIR );
+	return pte_json_encode( array( "success" => "Yay!" ) );
+}
