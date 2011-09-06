@@ -7,7 +7,7 @@ do (pte) ->
 
 	pte.admin = ->
 		timeout = 300
-		thickbox = """&TB_iframe=true&height=#{ pte_tb_height }&width=#{ pte_tb_width }"""
+		thickbox = """&TB_iframe=true&height=#{ window.options.pte_tb_height }&width=#{ window.options.pte_tb_width }"""
 		image_id = null
 		pte_url = (override_id) ->
 			id = override_id || image_id || $("#attachment-id").val()
@@ -17,27 +17,8 @@ do (pte) ->
 
 
 
-		fixThickbox = (parent) ->
-			p$ = parent.jQuery
-			if p$ == null then return
-			log "Got thickbox"
-			width = pte_tb_width + 40
-			height = pte_tb_height
-			thickbox = p$("#TB_window").css
-				'margin-left': 0 - (width / 2)
-				'width': width
-			.children("iframe").css
-				'width': width
-			parent.setTimeout ->
-				p$("iframe", thickbox).css
-					height: height + 100
-				#.resize()
-			, 1000
-
 		checkExistingThickbox = (e) ->
 			log "Start PTE..."
-			#if (window.parent?.tb_remove?)
-			#if window.parent isnt window
 			if window.parent.frames.length > 0
 				log "Modifying thickbox..."
 				# Bind the current context (a href=...) so that thickbox
@@ -45,10 +26,6 @@ do (pte) ->
 				do =>
 					#window.parent.setTimeout tb_click, 0
 					window.parent.tb_click()
-					# Set the correct width/height
-					fixThickbox(window.parent)
-					#$(window.parent.document).append(this).click()
-					#$(this).appendTo($("body", window.parent.document)).unbind().click()
 					true
 				e.stopPropagation()
 		# 
