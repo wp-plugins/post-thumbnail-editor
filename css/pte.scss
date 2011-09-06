@@ -35,7 +35,7 @@ a {
 	}
 }
 
-h1, { 
+h1 { 
 	color: #2386e2;
 	font-family: 'Amaranth', serif; 
 	font-style: italic; 
@@ -116,9 +116,15 @@ table td {
 	vertical-align: middle; 
 	padding: 15px 0;
 }
-	/*.col1 { */
-	/*width: 50px; */
-	/*}*/
+.col1 { 
+	$c1width: 30px;
+	max-width: $c1width; 
+	text-align: center;
+	width: $c1width; 
+	input {
+		margin: 0 auto;
+	}
+}
 /*.col2 { */
 /*   padding-right: 20px; */
 /*}*/
@@ -143,29 +149,109 @@ table td {
 
 @mixin full-screen {
 	height: 100%;
-	position: absolute;
+	position: fixed;
 	top: 0;
 	left: 0;
 	width: 100%;
 }
+@mixin full-screen-embedded {
+	position: relative;
+	margin: 0 auto;
+	text-align: center;
+}
+
+/* Used by #pte-log and #pte-loading */
+$opacity: 80;
+$opacity_percent: $opacity/100;
+.pte-opaque {
+	background-color: #000;
+	@include full-screen;
+	opacity: $opacity_percent;
+	-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=" + $opacity + ")";
+	filter: alpha(opacity=$opacity);
+	z-index: 0;
+}
+
+@mixin gradient($start, $end){
+	background-image: -webkit-gradient(linear, 0% 0%, 0% 100%, from($start), to($end));
+   background-image: -webkit-linear-gradient(top, $start, $end);
+   background-image:    -moz-linear-gradient(top, $start, $end);
+   background-image:     -ms-linear-gradient(top, $start, $end);
+   background-image:      -o-linear-gradient(top, $start, $end);
+}
+
+#pte-log {
+	@include full-screen;
+	display: none;
+	z-index: 1300;
+	color: #ddd;
+	a { color: white; }
+	#pte-log-container {
+		@include full-screen-embedded;
+		top: 5%;
+		height: 80%;
+	}
+	$link-gradient-start: #303080;
+	$link-gradient-end: #00007F;
+	a.button {
+		@include gradient($link-gradient-start, $link-gradient-end);
+		/*border: 2px solid white;*/
+		border-radius: 0 0 7px 7px;
+		-moz-border-radius: 0 0 7px 7px;
+		-webkit-border-radius: 0 0 7px 7px;
+		padding: 0 10px 3px 10px;
+		text-decoration: none;
+	}
+	a.button:hover { @include gradient($link-gradient-end, $link-gradient-start); }
+	p { 
+		line-height: 1.2em;
+		margin: 0 auto 20px; 
+		text-align: left; 
+		width: 90%; 
+	}
+	textarea {
+		height: 400px;
+		width: 90%;
+	}
+}
+
+$log-gradient-start: #FF0000;
+$log-gradient-end:   #CD0000;
+
+a#pte-log-button.show-log-messages {
+	background-color: $log-gradient-end;
+	border-radius: 0 0 7px 7px;
+	-moz-border-radius: 0 0 7px 7px;
+	-webkit-border-radius: 0 0 7px 7px;
+	top: 0;
+	right: 20px;
+	display: block;
+	/*left: 282px;*/
+	padding: 3px 5px 5px 5px;
+	position: fixed;
+	text-align: center;
+	color: white;
+	font-size: 0.9em;
+	font-style: italic; 
+	text-decoration: none;
+	text-shadow: none;
+	@include gradient($log-gradient-start, $log-gradient-end);
+}
+a#pte-log-button.show-log-messages:hover {
+	@include gradient($log-gradient-end, $log-gradient-start);
+}
+/* FIXES IE to bottom of screen */
+* html #pte-log-button.show-log-messages {
+	position:absolute;
+top:expression((0-(footer.offsetHeight)+(document.documentElement.clientHeight ? document.documentElement.clientHeight : document.body.clientHeight)+(ignoreMe = document.documentElement.scrollTop ? document.documentElement.scrollTop : document.body.scrollTop))+'px');
+}
 
 #pte-loading {
-	$opacity: 80;
-	$opacity_percent: $opacity/100;
 	@include full-screen;
-	#pte-loading-opaque {
-		background-color: #000;
-		@include full-screen;
-		opacity: $opacity_percent;
-		-ms-filter: "progid:DXImageTransform.Microsoft.Alpha(Opacity=" + $opacity + ")";
-		filter: alpha(opacity=$opacity);
-	}
 	#pte-loading-spinner {
-		position: relative;
+		@include full-screen-embedded;
 		top: 50%;
 		width: 200px;
-		margin: 0 auto;
-		text-align: center;
 	}
 }
 
@@ -180,7 +266,7 @@ table td {
 
 #stage2, #stage3 {
 	display: none;
-	left: $width * 2;
+	/*left: $width * 2;*/
 	width: $width;
 }
 

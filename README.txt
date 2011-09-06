@@ -1,8 +1,8 @@
 === Post Thumbnail Editor ===
 Contributors: sewpafly
-Donate link: http://github.com/sewpafly/post-thumbnail-editor
+Donate link: https://www.wepay.com/donate/34543
 Tags: post-thumbnail, post thumbnail, featured image, featured, editor, image, awesome
-Requires at least: 3.1
+Requires at least: 3.2.1
 Tested up to: 3.2.1
 Stable tag: trunk
 
@@ -59,8 +59,17 @@ Using a version with [json_encode](http://www.php.net/manual/en/function.json-en
 3. In the Edit subpage for media locate the box titled "Thumbnail Settings", and click the link to "Post Thumbnail Editor".
 4. Crop the image as you see fit and click "Create Thumbnails".
 5. Verify you want to keep the resized/recropped images by clicking "Okay, these look good..."
+6. Shortcut to edit the thumbnails from the picture metadata screen.
 
 == Changelog ==
+
+= 1.0.2 =
+* Problem with SVN commit of 1.0.1
+
+= 1.0.1 =
+* Fixed compatibility with other thickbox enabled plugins that called the wordpress media scripts.
+* Added Options screen (Settings -> Post Thumbnail Editor) to configure thickbox dimensions and enable/disable debugging.
+* Added Translation support & French translation (thanks to Li-An)
 
 = 1.0.0 =
 * Total redesign of PHP/HTML interface
@@ -78,6 +87,12 @@ Using a version with [json_encode](http://www.php.net/manual/en/function.json-en
 * Initial cut
 
 == Upgrade Notice ==
+
+= 1.0.2 =
+Problem with SVN commit of 1.0.1
+
+= 1.0.1 =
+Added translation support, french language, options menu and fixed incompatibility with other thickbox enabled plugins.
 
 = 1.0.0 =
 Now with more awesome.  Redesigned interface will challenge your perceptions of the universe.

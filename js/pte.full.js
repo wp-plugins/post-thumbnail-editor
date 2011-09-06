@@ -483,22 +483,170 @@
 	}
 })( jQuery );
 (function() {
-  var $, TimerFunc, determineAspectRatio, gcd, pte, window;
+  var $, Message, TimerFunc, deleteThumbs, deleteThumbsSuccessCallback, determineAspectRatio, gcd, pte, pte_queue, toType, window;
   var __bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
   window = this;
   $ = window.jQuery;
   window.pte = pte = pte || {};
-  window.log = function(obj) {
-    if (!window.debug_enabled) {
-      return true;
-    }
-    try {
-      console.log(obj);
-    } catch (error) {
-      alert(obj);
-    }
-    return true;
+  (function(pte) {
+    return pte.fixThickbox = function(parent) {
+      var $p, $thickbox, height, width;
+      $p = parent.jQuery;
+      if ($p === null || parent.frames.length < 1) {
+        return;
+      }
+      log("===== FIXING THICKBOX =====");
+      width = window.options.pte_tb_width + 30;
+      height = window.options.pte_tb_height + 38;
+      $thickbox = $p("#TB_window");
+      if ($thickbox.width() >= width && $thickbox.height() >= height) {
+        return;
+      }
+      log("THICKBOX: " + ($thickbox.width()) + " x " + ($thickbox.height()));
+      $thickbox.css({
+        'margin-left': 0 - (width / 2),
+        'width': width,
+        'height': height
+      }).children("iframe").css({
+        'width': width
+      });
+      return parent.setTimeout(function() {
+        if ($p("iframe", $thickbox).height() > height) {
+          return;
+        }
+        $p("iframe", $thickbox).css({
+          'height': height
+        });
+        log("THICKBOX: " + ($thickbox.width()) + " x " + ($thickbox.height()));
+        return true;
+      }, 1000);
+    };
+  })(pte);
+  toType = function(obj) {
+    return {}.toString.call(obj).match(/\s([a-z|A-Z]+)/)[1].toLowerCase();
   };
+  Message = (function() {
+    function Message(message) {
+      this.message = message;
+      this.date = new Date();
+    }
+    Message.prototype.toString = function() {
+      var D, M, d, h, m, message, pad, s, y;
+      pad = function(num, pad) {
+        while (("" + num).length < pad) {
+          num = "0" + num;
+        }
+        return num;
+      };
+      d = this.date;
+      y = pad(d.getUTCFullYear(), 4);
+      M = pad(d.getUTCMonth() + 1, 2);
+      D = pad(d.getUTCDate(), 2);
+      h = pad(d.getUTCHours(), 2);
+      m = pad(d.getUTCMinutes(), 2);
+      s = pad(d.getUTCSeconds(), 2);
+      switch (toType(this.message)) {
+        case "string":
+          message = this.message;
+          break;
+        default:
+          message = $.toJSON(this.message);
+      }
+      return "" + y + M + D + " " + h + ":" + m + ":" + s + " - [" + (toType(this.message)) + "] " + message;
+    };
+    return Message;
+  })();
+  (function(pte) {
+    pte.messages = [];
+    pte.log = function(obj) {
+      if (!window.options.pte_debug) {
+        return true;
+      }
+      try {
+        pte.messages.push(new Message(obj));
+        console.log(obj);
+        $('#pte-log-messages textarea').filter(':visible').val(pte.formatLog());
+      } catch (error) {
+
+      }
+    };
+    pte.formatLog = function() {
+      var log, message, _i, _len, _ref;
+      log = "";
+      _ref = pte.messages;
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        message = _ref[_i];
+        log += "" + message + "\n";
+      }
+      return log;
+    };
+    pte.parseServerLog = function(json) {
+      var message, _i, _len;
+      log("===== SERVER LOG =====");
+      if (((json != null ? json.length : void 0) != null) && json.length > 0) {
+        for (_i = 0, _len = json.length; _i < _len; _i++) {
+          message = json[_i];
+          log(message);
+        }
+      }
+      return true;
+    };
+    pte.sendToPastebin = function(text) {
+      var pastebin_url, post_data;
+      pastebin_url = "http://dpastey.appspot.com/";
+      post_data = {
+        title: "PostThumbnailEditor Log",
+        content: text,
+        lexer: "text",
+        format: "json",
+        expire_options: "2592000"
+      };
+      return $.ajax({
+        url: pastebin_url,
+        data: post_data,
+        dataType: "json",
+        global: false,
+        type: "POST",
+        error: function(xhr, status, errorThrown) {
+          $('#pte-log').fadeOut('900');
+          alert(objectL10n.pastebin_create_error);
+          log(xhr);
+          log(status);
+          return log(errorThrown);
+        },
+        success: function(data, status, xhr) {
+          $('#pte-log').fadeOut('900');
+          return prompt(objectL10n.pastebin_url, data.url);
+        }
+      });
+    };
+    return true;
+  })(pte);
+  window.log = pte.log;
+  $(document).ready(function($) {
+    $('#test').click(function(e) {
+      e.stopImmediatePropagation();
+      return true;
+    });
+    $('#pastebin').click(function(e) {
+      return pte.sendToPastebin(pte.formatLog());
+    });
+    $('#clear-log').click(function(e) {
+      pte.messages = [];
+      return $('#pte-log-messages textarea').val(pte.formatLog());
+    });
+    $('#close-log').click(function(e) {
+      return $('#pte-log').fadeOut('900');
+    });
+    $('#pte-log-tools a').click(function(e) {
+      return e.preventDefault();
+    });
+    return $('body').delegate('.show-log-messages', 'click', function(e) {
+      e.preventDefault();
+      $('#pte-log-messages textarea').val(pte.formatLog());
+      return $('#pte-log').fadeIn('900');
+    });
+  });
   /*
     POST-THUMBNAIL-EDITOR Script for Wordpress
   
@@ -506,9 +654,9 @@
   */
   (function(pte) {
     return pte.admin = function() {
-      var $getLink, checkExistingThickbox, fixThickbox, image_id, injectPTE, launchPTE, pte_url, thickbox, timeout;
+      var $getLink, checkExistingThickbox, image_id, injectPTE, launchPTE, pte_url, thickbox, timeout;
       timeout = 300;
-      thickbox = "&TB_iframe=true&height=" + pte_tb_height + "&width=" + pte_tb_width;
+      thickbox = "&TB_iframe=true&height=" + window.options.pte_tb_height + "&width=" + window.options.pte_tb_width;
       image_id = null;
       pte_url = function(override_id) {
         var id;
@@ -518,34 +666,12 @@
       $getLink = function(id) {
         return $("<a class=\"thickbox\" href=\"" + (pte_url(id)) + "\">" + objectL10n.PTE + "</a>");
       };
-      fixThickbox = function(parent) {
-        var height, p$, width;
-        p$ = parent.jQuery;
-        if (p$ === null) {
-          return;
-        }
-        log("Got thickbox");
-        width = pte_tb_width + 40;
-        height = pte_tb_height;
-        thickbox = p$("#TB_window").css({
-          'margin-left': 0 - (width / 2),
-          'width': width
-        }).children("iframe").css({
-          'width': width
-        });
-        return parent.setTimeout(function() {
-          return p$("iframe", thickbox).css({
-            height: height + 100
-          });
-        }, 1000);
-      };
       checkExistingThickbox = function(e) {
         log("Start PTE...");
         if (window.parent.frames.length > 0) {
           log("Modifying thickbox...");
           __bind(function() {
             window.parent.tb_click();
-            fixThickbox(window.parent);
             return true;
           }, this)();
           return e.stopPropagation();
@@ -602,45 +728,103 @@
     return Math.floor(Math.random() * 1000001).toString(16);
   };
   window.debugTmpl = function(data) {
+    log("===== TEMPLATE DEBUG DATA FOLLOWS =====");
     log(data);
     return true;
   };
+  deleteThumbs = function(id) {
+    var delete_options;
+    delete_options = {
+      "id": id,
+      'action': 'pte_ajax',
+      'pte-action': 'delete-images',
+      'pte-nonce': $('#pte-delete-nonce').val()
+    };
+    return $.ajax({
+      url: ajaxurl,
+      data: delete_options,
+      global: false,
+      dataType: "json",
+      success: deleteThumbsSuccessCallback
+    });
+  };
+  deleteThumbsSuccessCallback = function(data, status, xhr) {
+    log("===== DELETE SUCCESSFUL, DATA DUMP FOLLOWS =====");
+    log(data);
+    return pte.parseServerLog(data.log);
+  };
+  pte_queue = $({});
+  $.fn.extend({
+    move: function(options) {
+      var defaults;
+      defaults = {
+        direction: 'left',
+        speed: 500,
+        easing: 'swing',
+        toggle: true,
+        callback: null,
+        callbackargs: null
+      };
+      options = $.extend(defaults, options);
+      this.each(function() {
+        return pte_queue.queue(__bind(function(next) {
+          var $elem, direction, isVisible, move_to;
+          $elem = $(this);
+          direction = options.direction === 'left' ? -1 : 1;
+          move_to = $elem.css('left') === "0px" ? $(window).width() * direction : 0;
+          isVisible = $elem.is(':visible');
+          if (!isVisible) {
+            $elem.show(0, function() {
+              return $(this).animate({
+                'left': move_to
+              }, options.speed, options.easing, next);
+            });
+          } else {
+            $elem.animate({
+              'left': move_to
+            }, options.speed, options.easing);
+            $elem.hide(0, next);
+          }
+          return true;
+        }, this));
+      });
+      if (options.callback) {
+        pte_queue.queue(function(next) {
+          if (options.callbackargs != null) {
+            options.callback.apply(this, options.callbackargs);
+          } else {
+            options.callback.apply(this);
+          }
+          return next();
+        });
+      }
+      return this;
+    },
+    moveRight: function(options) {
+      options = $.extend(options, {
+        direction: 'right'
+      });
+      return this.move(options);
+    },
+    moveLeft: function(options) {
+      options = $.extend(options, {
+        direction: 'left'
+      });
+      return this.move(options);
+    }
+  });
   window.goBack = function(e) {
     if (e != null) {
       e.preventDefault();
     }
-    return $('#stage2').animate({
-      left: 1200
-    }, 500, 'swing', function() {
-      $(this).hide();
-      return $('#stage1').show(0, function() {
-        return $(this).animate({
-          left: 0
-        }, 500, 'swing', function() {
-          var delete_options;
-          log("okay cleanup");
-          delete_options = {
-            "id": $('#pte-post-id').val(),
-            'action': 'pte_ajax',
-            'pte-action': 'delete-images',
-            'pte-nonce': $('#pte-delete-nonce').val()
-          };
-          return $.ajax({
-            url: ajaxurl,
-            data: delete_options,
-            global: false,
-            dataType: "json",
-            success: function(data, status, xhr) {
-              if (data.error != null) {
-                return log(data.error);
-              } else {
-                return log("Deleted tmp files");
-              }
-            }
-          });
-        });
-      });
+    $('#stage2').moveRight();
+    $('#stage1').moveRight({
+      callback: function() {
+        deleteThumbs($('#pte-post-id').val());
+        return $('#stage2').html('');
+      }
     });
+    return true;
   };
   gcd = function(a, b) {
     if (a === 0) {
@@ -658,9 +842,9 @@
     }
     return a;
   };
-  determineAspectRatio = function(current_ar, size) {
-    var crop, gc, height, tmp_ar, width, _ref;
-    _ref = thumbnail_info[size], crop = _ref.crop, width = _ref.width, height = _ref.height;
+  determineAspectRatio = function(current_ar, size_info) {
+    var crop, gc, height, tmp_ar, width;
+    crop = size_info.crop, width = size_info.width, height = size_info.height;
     crop = +crop;
     width = +width;
     height = +height;
@@ -675,25 +859,32 @@
         }
       }
       if ((current_ar != null) && (tmp_ar != null) && tmp_ar !== current_ar) {
-        throw "Too many Aspect Ratios. Disabling";
+        throw objectL10n.aspect_ratio_disabled;
       }
-      return current_ar = tmp_ar;
+      current_ar = tmp_ar;
     }
+    return current_ar;
+  };
+  pte.functions = {
+    determineAspectRatio: determineAspectRatio
   };
   (function(pte) {
-    var addCheckAllNoneListener, addRowListener, addRowListeners, addSubmitListener, addVerifyListener, editor, iasSetAR, ias_defaults, ias_instance, initImgAreaSelect, setPageHeight;
+    var addCheckAllNoneListener, addRowListener, addRowListeners, addSubmitListener, addVerifyListener, configureOverlay, configurePageDisplay, editor, iasSetAR, ias_defaults, ias_instance, initImgAreaSelect;
     editor = pte.editor = function() {
-      var $loading_screen, closeLoadingScreen;
-      setPageHeight();
+      configurePageDisplay();
       addRowListeners();
       initImgAreaSelect();
       addRowListener();
       addSubmitListener();
       addVerifyListener();
       addCheckAllNoneListener();
+      configureOverlay();
+      return true;
+    };
+    configureOverlay = function() {
+      var $loading_screen, closeLoadingScreen;
       $loading_screen = $('#pte-loading');
       closeLoadingScreen = function() {
-        log("Closing load screen");
         $loading_screen.hide();
         return true;
       };
@@ -706,16 +897,21 @@
       window.setTimeout(closeLoadingScreen, 2000);
       return true;
     };
-    setPageHeight = function() {
+    configurePageDisplay = function() {
       var reflow;
       reflow = new TimerFunc(function() {
         var offset, window_height;
-        log("reflow called...");
+        log("===== REFLOW =====");
+        pte.fixThickbox(window.parent);
         offset = $("#pte-sizes").offset();
         window_height = $(window).height() - offset.top - 2;
         return $("#pte-sizes").height(window_height);
       }, 100);
-      return $(window).resize(reflow.doFunc).load(reflow.doFunc);
+      $(window).resize(reflow.doFunc).load(reflow.doFunc);
+      $('#stage2, #stage3').css({
+        left: $(window).width()
+      });
+      return true;
     };
     addRowListeners = function() {
       var enableRowFeatures;
@@ -749,32 +945,41 @@
       instance: true,
       onSelectEnd: function(img, s) {
         if (s.width && s.width > 0 && s.height && s.height > 0 && $('.pte-size').filter(':checked').size() > 0) {
-          log("Enabling button");
           return $('#pte-submit').removeAttr('disabled');
         } else {
-          log("Disabling button");
           return $('#pte-submit').attr('disabled', true);
         }
       }
     };
     initImgAreaSelect = function() {
-      return ias_instance = $('#pte-image img').imgAreaSelect(ias_defaults);
+      return pte.ias = ias_instance = $('#pte-image img').imgAreaSelect(ias_defaults);
     };
     iasSetAR = function(ar) {
-      log("setting aspectRatio: " + ar);
+      log("===== SETTING ASPECTRATIO: " + ar + " =====");
       ias_instance.setOptions({
         aspectRatio: ar
       });
       return ias_instance.update();
     };
     addRowListener = function() {
-      var pteCheckHandler;
+      var pteCheckHandler, pteVerifySubmitButtonHandler;
+      pteVerifySubmitButtonHandler = new TimerFunc(function() {
+        log("===== CHECK SUBMIT BUTTON =====");
+        if ($('.pte-confirm').filter(':checked').size() > 0) {
+          log("ENABLE");
+          $('#pte-confirm').removeAttr('disabled');
+        } else {
+          log("DISABLE");
+          $('#pte-confirm').attr('disabled', true);
+        }
+        return true;
+      }, 50);
       pteCheckHandler = new TimerFunc(function() {
         var ar, selected_elements;
         ar = null;
         selected_elements = $('input.pte-size').filter(':checked').each(function(i, elem) {
           try {
-            ar = determineAspectRatio(ar, $(elem).val());
+            ar = determineAspectRatio(ar, thumbnail_info[$(elem).val()]);
           } catch (error) {
             ar = null;
             if (ar !== ias_instance.getOptions().aspectRatio) {
@@ -788,14 +993,18 @@
         ias_defaults.onSelectEnd(null, ias_instance.getSelection());
         return true;
       }, 50);
-      return $('input.pte-size').click(pteCheckHandler.doFunc);
+      $.extend(pte.functions, {
+        pteVerifySubmitButtonHandler: pteVerifySubmitButtonHandler
+      });
+      $('input.pte-size').click(pteCheckHandler.doFunc);
+      return $('.pte-confirm').live('click', function(e) {
+        return pteVerifySubmitButtonHandler.doFunc();
+      });
     };
-    /* Callback for resizing images (Stage 1 to 2) */
     addSubmitListener = function() {
       var onResizeImages;
       $('#pte-submit').click(function(e) {
         var scale_factor, selection, submit_data;
-        log("Clicked Submit...");
         selection = ias_instance.getSelection();
         scale_factor = $('#pte-sizer').val();
         submit_data = {
@@ -810,6 +1019,7 @@
           'w': Math.floor(selection.width / scale_factor),
           'h': Math.floor(selection.height / scale_factor)
         };
+        log("===== RESIZE-IMAGES =====");
         log(submit_data);
         ias_instance.setOptions({
           hide: true,
@@ -823,22 +1033,16 @@
         return true;
       });
       return onResizeImages = function(data, status, xhr) {
-        /* Evaluate data */        log(data);
+        /* Evaluate data */        log("===== RESIZE-IMAGES SUCCESS =====");
+        log(data);
+        pte.parseServerLog(data.log);
         if ((data.error != null) && !(data.thumbnails != null)) {
           alert(data.error);
           return;
         }
-        $('#stage1').animate({
-          left: -$(window).width()
-        }, 500, 'swing', function() {
-          $(this).hide();
-          $('#stage2').html($('#stage2template').tmpl(data)).show(0, function() {
-            $(this).animate({
-              left: 0
-            }, 500);
-            return true;
-          });
-          return true;
+        $('#stage1').moveLeft();
+        $('#stage2').html($('#stage2template').tmpl(data)).moveLeft({
+          callback: pte.functions.pteVerifySubmitButtonHandler.doFunc
         });
         return false;
       };
@@ -848,7 +1052,6 @@
       var onConfirmImages;
       $('#pte-confirm').live('click', function(e) {
         var submit_data, thumbnail_data;
-        log("Confirming");
         thumbnail_data = {};
         $('input.pte-confirm').filter(':checked').each(function(i, elem) {
           var size;
@@ -862,28 +1065,21 @@
           'pte-nonce': $('#pte-nonce').val(),
           'pte-confirm': thumbnail_data
         };
+        log("===== CONFIRM-IMAGES =====");
         log(submit_data);
         return $.getJSON(ajaxurl, submit_data, onConfirmImages);
       });
       return onConfirmImages = function(data, status, xhr) {
+        log("===== CONFIRM-IMAGES SUCCESS =====");
         log(data);
-        $('#stage2').animate({
-          left: -$(window).width()
-        }, 500, 'swing', function() {
-          $(this).hide();
-          $('#stage3').html($('#stage3template').tmpl(data)).show(0, function() {
-            $(this).animate({
-              left: 0
-            }, 500);
-            return true;
-          });
-          return true;
-        });
+        pte.parseServerLog(data.log);
+        $('#stage2').moveLeft();
+        $('#stage3').html($('#stage3template').tmpl(data)).moveLeft();
         return false;
       };
     };
     /* Select ALL|NONE */
-    return addCheckAllNoneListener = function() {
+    addCheckAllNoneListener = function() {
       var checkAllSizes, uncheckAllSizes;
       uncheckAllSizes = function(e) {
         var elements, _ref, _ref2;
@@ -911,5 +1107,8 @@
       }, uncheckAllSizes);
       return true;
     };
+    return $.extend(pte.functions, {
+      iasSetAR: iasSetAR
+    });
   })(pte);
 }).call(this);
