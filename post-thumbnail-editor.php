@@ -3,7 +3,7 @@
    Plugin URI: http://wordpress.org/extend/plugins/post-thumbnail-editor/
    Author: sewpafly
    Author URI: http://sewpafly.github.com/post-thumbnail-editor
-   Version: 1.0.0
+   Version: 1.0.1
    Description: Individually manage your post thumbnails
 
     LICENSE
@@ -34,14 +34,51 @@
  */
 define( 'PTE_PLUGINURL', plugins_url(basename( dirname(__FILE__))) . "/");
 define( 'PTE_PLUGINPATH', dirname(__FILE__) . "/");
-define( 'PTE_VERSION', "1.0.0");
-define( 'PTE_TB_WIDTH', 750 ); // Only edit this if you feel like living dangerously... Thar be dragons...
-define( 'PTE_TB_HEIGHT', 550 ); // This could go larger but I wouldn't go much smaller
-										  // Pictures take up 400px with the header and potential error space
-										  // 600 seems the best safe number. 
-										  // Difficult to say with different screen heights
+define( 'PTE_DOMAIN', "post-thumbnail-editor");
+define( 'PTE_VERSION', "1.0.1");
 
-define( 'PTE_DEBUG', false );  // Eventually add a control panel option for this
+/*
+ * Option Functionality
+ */
+function pte_get_option_name(){
+	global $current_user;
+	if ( ! isset( $current_user ) ){
+		get_currentuserinfo();
+	}
+	return "pte-option-{$current_user->ID}";
+}
+
+function pte_get_user_options(){
+	$pte_options = get_option( pte_get_option_name() );
+	if ( !is_array( $pte_options ) ){
+		$pte_options = array();
+	}
+	$defaults = array( 'pte_tb_width' => 750
+		, 'pte_tb_height' => 550
+		, 'pte_debug' => false
+	);
+	return array_merge( $defaults, $pte_options );
+}
+
+function pte_get_site_options(){
+	$pte_site_options = get_option( 'pte-site-options' );
+	if ( !is_array( $pte_site_options ) ){
+		$pte_site_options = array();
+	}
+	$defaults = array( 'pte_hidden_sizes' => array() );
+	return array_merge( $defaults, $pte_site_options );
+}
+
+function pte_get_options(){
+	global $pte_options, $current_user;
+	if ( isset( $pte_options ) ){
+		return $pte_options;
+	}
+
+	$pte_options = array_merge( pte_get_user_options(), pte_get_site_options() );
+
+	return $pte_options;
+}
 
 /*
  * Put Hooks and immediate hook functions in this file
@@ -55,8 +92,9 @@ function pte_enable_thickbox(){
 
 function pte_admin_media_scripts(){
 	pte_enable_thickbox();
+	$options = pte_get_options();
 
-	if ( PTE_DEBUG ){
+	if ( $options['pte_debug'] ){
 		wp_enqueue_script( 'pte'
 			, PTE_PLUGINURL . 'js/pte.full.js'
 			, array('jquery')
@@ -78,25 +116,27 @@ function pte_admin_media_scripts(){
 }
 
 function pte_enable_admin_js(){
-	$debug = PTE_DEBUG ? "var debug_enabled = true;" : "";
-	$pte_tb_width = PTE_TB_WIDTH;
-	$pte_tb_height = PTE_TB_HEIGHT;
+	$options = json_encode( pte_get_options() );
 	echo <<<EOT
 		<script type="text/javascript">
-			{$debug}
-			var pte_tb_width = {$pte_tb_width};
-			var pte_tb_height = {$pte_tb_height};
+			var options = {$options};
 			jQuery( function(){ pte.admin(); } );
 		</script>
 EOT;
 }
 
+// Base url/function.  All pte interactions go through here
 function pte_ajax(){
    // Move all adjuntant functions to a separate file and include that here
-   require_once(PTE_PLUGINPATH . 'pte_functions.php');
+   require_once(PTE_PLUGINPATH . 'php/functions.php');
+	$logger = PteLogger::singleton();
+	$logger->debug( "PARAMETERS: " . print_r( $_REQUEST, true ) );
 
    switch ($_GET['pte-action'])
    {
+      case "test":
+			pte_test();
+			break;
       case "launch":
 			pte_launch();
 			break;
@@ -110,19 +150,42 @@ function pte_ajax(){
 			pte_delete_images();
 			break;
    }
-   die(-1);
+   die();
 }
 
 function pte_media_row_actions($actions, $post, $detached){
+	// Add capability check
 	if ( !current_user_can( 'edit_post', $post->ID ) ){
 		return $actions;
 	}
+	$options = pte_get_options();
 	$pte_url = admin_url('admin-ajax.php') 
 		. "?action=pte_ajax&pte-action=launch&id=" 
 		. $post->ID
-		. "&TB_iframe=true&height=". PTE_TB_HEIGHT ."&width=". PTE_TB_WIDTH;
-	$actions['pte'] = "<a class='thickbox' href='${pte_url}' title='Edit Thumbnails'>Thumbnails</a>";
+		. "&TB_iframe=true&height={$options['pte_tb_height']}&width={$options['pte_tb_width']}";
+	$actions['pte'] = "<a class='thickbox' href='${pte_url}' title='"
+		. __( 'Edit Thumbnails', PTE_DOMAIN )
+		. "'>" . __( 'Thumbnails', PTE_DOMAIN ) . "</a>";
 	return $actions;
+}
+
+// Anonymous function (which apparently some versions of PHP will whine about)
+function pte_launch_options_page(){
+   require_once( PTE_PLUGINPATH . 'php/options.php' ); pte_options_page();
+}
+
+function pte_admin_menu(){
+	add_options_page( __('Post Thumbnail Editor', PTE_DOMAIN) . "-title",
+		__('Post Thumbnail Editor', PTE_DOMAIN),
+		'edit_posts', // Set the capability to null as every user can have different settings set
+		'pte',
+		'pte_launch_options_page'
+	);
+}
+
+function pte_options(){
+	require_once( PTE_PLUGINPATH . 'php/options.php' );
+	pte_options_init();
 }
 
 /* This is the main admin media page */
@@ -143,4 +206,15 @@ add_filter('media_row_actions', 'pte_media_row_actions', 10, 3); // priority: 10
 /* For all purpose needs */
 add_action('wp_ajax_pte_ajax', 'pte_ajax');
 
+/* Add Settings Page */
+add_action( 'admin_menu', 'pte_admin_menu' );
+add_action( 'settings_page_pte', 'pte_options' );
+add_action( 'load-options.php', 'pte_options' );
+//add_action( 'admin_init', 'pte_options' );
+
+/** End Settings Hooks **/
+
+	load_plugin_textdomain( PTE_DOMAIN
+		, false
+		, basename( PTE_PLUGINPATH ) . DIRECTORY_SEPARATOR . "i18n" );
 ?>
