@@ -72,6 +72,7 @@ $.fn.extend
 				# if this object is currently hidden, show it
 				# if this object is currently shown, hide it
 				isVisible = $elem.is(':visible')
+				log [direction,move_to,isVisible]
 				if (not isVisible)
 					$elem.show 0, ->
 						$(this).animate {'left': move_to}, options.speed, options.easing, next
@@ -79,12 +80,15 @@ $.fn.extend
 					$elem.animate {'left': move_to}, options.speed, options.easing
 					$elem.hide 0, next
 				true
-		if (options.callback)
+		if options.callback?
 			pte_queue.queue (next) ->
 				if options.callbackargs?
-					options.callback.apply this, options.callbackargs 
+					log "running callback with arguments"
+					options.callback.apply this, options.callbackargs
 				else
+					log "running callback with no arguments"
 					options.callback.apply this
+				log "finished running callback"
 				next()
 		return this
 
@@ -196,13 +200,15 @@ do (pte) ->
 			offset = $("#pte-sizes").offset()
 			window_height = $(window).height() - offset.top - 2
 			$("#pte-sizes").height window_height
+			# Set the left position of stages2,3
+			log """WINDOW WIDTH: #{$(window).width()}"""
+			$('#stage2, #stage3').filter(":hidden").css
+				left: $(window).width()
+			true
 		, 100
 		# Add to the resize and load events
 		$(window).resize(reflow.doFunc).load(reflow.doFunc)
 
-		# Set the left position of stages2,3
-		$('#stage2, #stage3').css
-			left: $(window).width()
 		true
 
 
@@ -243,6 +249,7 @@ do (pte) ->
 		zIndex: 1200
 		instance: true
 		onSelectEnd: (img, s) ->
+			# Check that getSelection returns valid information...
 			if s.width && s.width > 0 and s.height && s.height > 0 and $('.pte-size').filter(':checked').size() > 0
 				$('#pte-submit').removeAttr('disabled')
 			else
@@ -322,6 +329,10 @@ do (pte) ->
 				'h': Math.floor(selection.height/scale_factor)
 			log "===== RESIZE-IMAGES ====="
 			log submit_data
+			if isNaN(submit_data.x) or isNaN(submit_data.y) or isNaN(submit_data.w) or isNaN(submit_data.h)
+				alert objectL10n.crop_submit_data_error
+				log "ERROR with submit_data and NaN's"
+				return false
 			ias_instance.setOptions
 				hide: true
 				x1: 0

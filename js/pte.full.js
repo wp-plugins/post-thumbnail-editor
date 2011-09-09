@@ -773,6 +773,7 @@
           direction = options.direction === 'left' ? -1 : 1;
           move_to = $elem.css('left') === "0px" ? $(window).width() * direction : 0;
           isVisible = $elem.is(':visible');
+          log([direction, move_to, isVisible]);
           if (!isVisible) {
             $elem.show(0, function() {
               return $(this).animate({
@@ -788,13 +789,16 @@
           return true;
         }, this));
       });
-      if (options.callback) {
+      if (options.callback != null) {
         pte_queue.queue(function(next) {
           if (options.callbackargs != null) {
+            log("running callback with arguments");
             options.callback.apply(this, options.callbackargs);
           } else {
+            log("running callback with no arguments");
             options.callback.apply(this);
           }
+          log("finished running callback");
           return next();
         });
       }
@@ -905,12 +909,14 @@
         pte.fixThickbox(window.parent);
         offset = $("#pte-sizes").offset();
         window_height = $(window).height() - offset.top - 2;
-        return $("#pte-sizes").height(window_height);
+        $("#pte-sizes").height(window_height);
+        log("WINDOW WIDTH: " + ($(window).width()));
+        $('#stage2, #stage3').filter(":hidden").css({
+          left: $(window).width()
+        });
+        return true;
       }, 100);
       $(window).resize(reflow.doFunc).load(reflow.doFunc);
-      $('#stage2, #stage3').css({
-        left: $(window).width()
-      });
       return true;
     };
     addRowListeners = function() {
@@ -1021,6 +1027,11 @@
         };
         log("===== RESIZE-IMAGES =====");
         log(submit_data);
+        if (isNaN(submit_data.x) || isNaN(submit_data.y) || isNaN(submit_data.w) || isNaN(submit_data.h)) {
+          alert(objectL10n.crop_submit_data_error);
+          log("ERROR with submit_data and NaN's");
+          return false;
+        }
         ias_instance.setOptions({
           hide: true,
           x1: 0,
