@@ -167,7 +167,7 @@ function pte_get_image_data( $id, $size, $size_data ){
 			$size_data['crop']
 		);
 		if ($resized){
-			$metadata = wp_get_attachment_metadata($id);
+			$metadata = wp_get_attachment_metadata($id, true);
 			$metadata['sizes'][$size] = $resized;
 			wp_update_attachment_metadata( $id, $metadata);
 		}
@@ -257,6 +257,7 @@ function pte_launch(){
 		, array( 'pastebin_create_error' => __( 'Sorry, there was a problem trying to send to pastebin', PTE_DOMAIN )
 			, 'pastebin_url' => __( 'PASTEBIN URL:', PTE_DOMAIN )
 			, 'aspect_ratio_disabled' => __( 'Disabling aspect ratio', PTE_DOMAIN )
+			, 'crop_submit_data_error' => __( 'Error parsing selection information', PTE_DOMAIN )
 		)
 	);
 
@@ -267,12 +268,26 @@ function pte_launch(){
 	// Get the information needed for image preview 
 	//   (See wp-admin/includes/image-edit.php)
 	$nonce = wp_create_nonce("image_editor-$id");
-	$meta = wp_get_attachment_metadata($id);
+	$meta = wp_get_attachment_metadata($id, true);
 
-	if ( is_array($meta) && isset($meta['width']) )
+	if ( is_array($meta) && isset( $meta['width'] ) ){
 		$big = max( $meta['width'], $meta['height'] );
+	}
+	else {
+		$logger->error( 
+			sprintf( __( "Invalid meta data for POST #%d: %s" )
+				, $id
+				, print_r( $meta, true ) 
+			) 
+		);
+		$logger->error( __( "Please contact support", PTE_DOMAIN ) );
+	}
 
 	$sizer = $big > 400 ? 400 / $big : 1;
+	$sizer = sprintf( "%.8F", $sizer );
+	$logger->debug( "USER-AGENT: " . $_SERVER['HTTP_USER_AGENT'] );
+	$logger->debug( "WORDPRESS: " . $GLOBALS['wp_version'] );
+	$logger->debug( "SIZER: ${sizer}" );
 
 	require( PTE_PLUGINPATH . "html/pte.php" );
 }
@@ -585,7 +600,7 @@ function pte_confirm_images(){
 		list( $w, $h, $type ) = $image_dimensions;
 		//print("IMAGE DIMENSIONS...");
 		//print_r( $image_dimensions );
-		$metadata = wp_get_attachment_metadata( $id );
+		$metadata = wp_get_attachment_metadata( $id, true );
 		$metadata['sizes'][$size] = array( 
 			'file' => basename( $new_file ),
 			'width' => $w,
