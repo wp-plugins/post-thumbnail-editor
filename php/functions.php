@@ -3,7 +3,7 @@
  * TODO: add helper functions to get various links to different functions
  */
 
-require_once( "log.php" );
+require_once(PTE_PLUGINPATH . 'php/log.php');
 
 function pte_require_json() {
 	if ( function_exists( 'ob_start' ) ){
@@ -288,6 +288,7 @@ function pte_launch(){
 	$logger->debug( "USER-AGENT: " . $_SERVER['HTTP_USER_AGENT'] );
 	$logger->debug( "WORDPRESS: " . $GLOBALS['wp_version'] );
 	$logger->debug( "SIZER: ${sizer}" );
+	$logger->debug( "META: " . print_r( $meta, true ) );
 
 	require( PTE_PLUGINPATH . "html/pte.php" );
 }
@@ -585,10 +586,18 @@ function pte_confirm_images(){
 		$new_file = $dir
 			. DIRECTORY_SEPARATOR
 			. basename( $good_file );
-		if ( isset( $data['file'] ) ){
+		if ( isset( $data['current']['file'] ) ){
 			$old_file = $dir
 				. DIRECTORY_SEPARATOR
-				. $data['file'];
+				. $data['current']['file'];
+		}
+
+		// Delete/unlink old file
+		if ( isset( $old_file ) 
+			&& file_exists( $old_file ) )
+		{
+			$logger->debug( "Deleting old thumbnail: {$old_file}" );
+			unlink( $old_file );
 		}
 
 		// Move good image
@@ -608,15 +617,6 @@ function pte_confirm_images(){
 		);
 		$logger->debug( "Updating '{$size}' metadata: " . print_r( $metadata['sizes'][$size], true ) );
 		wp_update_attachment_metadata( $id, $metadata);
-
-		// Delete/unlink old file
-		if ( isset( $old_file ) 
-			&& $old_file !== $new_file 
-			&& file_exists( $old_file ) )
-		{
-			$logger->debug( "Deleting old thumbnail: {$old_file}" );
-			unlink( $old_file );
-		}
 	}
 	// Delete tmpdir
 	pte_rmdir( $PTE_TMP_DIR );

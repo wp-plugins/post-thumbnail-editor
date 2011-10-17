@@ -114,7 +114,7 @@
 					<td class="col2">
 						<div class="pte-size-label">${$index}</div>
 						<img src="${$value.url}?${randomness()}"/>
-						<input id="pte-${$index}-file" type="hidden" value="${$value.file}"/>
+						<input class="pte-file" type="hidden" value="${$value.file}"/>
 					</td>
 				</tr>
 			{{/each}}
@@ -140,13 +140,13 @@
 					printf( __( 'Click %1$shere%2$s to modify another thumbnail.' , PTE_DOMAIN ), '<a href="" onclick="window.location.reload();">', '</a>' );
 					?></p>
 			</div>
-				{{if $data['error']}}
-				<div id="error"><?php _e( 'We noticed some potential issues:', PTE_DOMAIN ); ?>
-					<ul>
-						{{each $data['error']}}<li>${$value}</li>{{/each}}
-					</ul>
-				</div>
-				{{/if}}
+			{{/if}}
+			{{if $data['error']}}
+			<div id="error"><?php _e( 'We noticed some potential issues:', PTE_DOMAIN ); ?>
+				<ul>
+					{{each $data['error']}}<li>${$value}</li>{{/each}}
+				</ul>
+			</div>
 			{{/if}}
 		</script>
 		<div id="pte-loading"> 
