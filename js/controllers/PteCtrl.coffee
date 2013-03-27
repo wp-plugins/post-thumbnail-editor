@@ -14,12 +14,12 @@ define [
          crop: on
          view: off
       $scope.changePage = (page) ->
-         $scope.viewFilterValue = false
+         $scope.viewFilterValue = off
          for key, value of $scope.page
             if key == page
-               $scope.page[key] = true
+               $scope.page[key] = on
             else
-               $scope.page[key] = false
+               $scope.page[key] = off
 
       ###
       # Set the Tab Class to active when the page is enabled
@@ -33,7 +33,7 @@ define [
       ###
       # Resource
       ###
-      $scope.thumbnailResource = $resource settings.getWindowVar('ajaxurl'),
+      $scope.thumbnailResource = $resource settings.ajaxurl,
          'action': 'pte_ajax'
          'pte-action': 'get-thumbnail-info'
       
@@ -57,14 +57,14 @@ define [
       # 
       # Using the tab buttons will reset this feature.
       ###
-      $scope.viewFilterValue = false
+      $scope.viewFilterValue = off
       $scope.view = (val) ->
          event?.stopPropagation?()
          $scope.changePage('view')
          $scope.viewFilterValue = val
          return
       $scope.viewFilterFunc = (thumbnail) ->
-         if $scope.viewFilterValue is false
+         if $scope.viewFilterValue is off
             return true
          if angular.isString $scope.viewFilterValue
             if thumbnail.name is $scope.viewFilterValue
@@ -75,6 +75,7 @@ define [
             # check if thumbnail.name is in array
             if thumbnail.name in $scope.viewFilterValue
                return true
+         # This sets the view to show only the recently changed images
          if $scope.viewFilterValue
             return thumbnail.proposed?
          return true
@@ -107,20 +108,38 @@ define [
          $log.log data
 
          confirm_results = $scope.thumbnailResource.get data, ->
-            if !confirm_results.thumbnails
-               $scope.setErrorMessage $scope.i18n.save_crop_problem
-               return
-            #$filter('randomizeUrl') {reset: true}
-            for thumbnail in thumbnail_array
+            $scope.confirmResults confirm_results
+
+         return
+
+      $scope.confirmResults = (confirm_results) ->
+         if !confirm_results.thumbnails
+            $scope.setErrorMessage $scope.i18n.save_crop_problem
+            return
+         #$filter('randomizeUrl') {reset: true}
+         viewFilter = []
+         resetUrls = []
+         for thumbnail in $scope.thumbnails
+            if confirm_results.thumbnails[thumbnail.name]
+               viewFilter.push thumbnail.name
                thumbnail.current = confirm_results.thumbnails[thumbnail.name].current
+               resetUrls.push thumbnail.current.url
+               if thumbnail.proposed?.url
+                   resetUrls.push thumbnail.proposed.url
                #if !angular.isObject thumbnail.current
                #   thumbnail.current = {}
                #thumbnail.current.url = thumbnail.proposed.url
                #thumbnail.selected = false
                $scope.trash thumbnail
-            return
+         if confirm_results.immediate
+            # Change to the view
+            $scope.view viewFilter
+         else
+            checkFilter()
 
+         $filter('randomizeUrl') {reset: true, urls: resetUrls}
          return
+
 
       ###
       # Clean up procedures
@@ -133,6 +152,14 @@ define [
          event?.stopPropagation?()
          delete thumbnail.proposed
          thumbnail.showProposed = false
+         # if there aren't any other proposed, set the viewFilter to false
+         checkFilter()
+
+      checkFilter = ->
+         for thumbnail in $scope.thumbnails
+            if thumbnail.proposed
+               return
+         $scope.viewFilterValue = off
 
       $scope.trashAll = ->
          deleteTemp()
@@ -142,7 +169,7 @@ define [
       deleteTemp = ->
          if not nonces?['pte-delete-nonce']?
             return
-         deleteResults = $.ajax settings.getWindowVar('ajaxurl'),
+         deleteResults = $.ajax settings.ajaxurl,
             async: false
             data:
                'action': 'pte_ajax'
@@ -183,11 +210,11 @@ define [
       ###
       # Initialization
       ###
-      id = settings.getWindowVar('post_id')
+      id = settings.id
       if !id
          $log.error "No ID Found"
 
-      $scope.i18n = settings.getWindowVar 'pteI18n'
+      $scope.i18n = settings.i18n
 
       $scope.infoMessage = null
       $scope.setInfoMessage = (message) ->
@@ -209,6 +236,7 @@ define [
             addToAspectRatios thumb
             return
          , $scope
+         $scope.updateSelected()
          return
 
       $scope.anyProposed = ->

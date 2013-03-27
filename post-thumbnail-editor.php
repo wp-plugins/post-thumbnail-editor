@@ -3,7 +3,7 @@
    Plugin URI: http://wordpress.org/extend/plugins/post-thumbnail-editor/
    Author: sewpafly
    Author URI: http://sewpafly.github.com/post-thumbnail-editor
-   Version: 2.0.0
+   Version: 2.0.1-beta
    Description: Individually manage your post thumbnails
 
     LICENSE
@@ -35,7 +35,7 @@
 define( 'PTE_PLUGINURL', plugins_url(basename( dirname(__FILE__))) . "/");
 define( 'PTE_PLUGINPATH', dirname(__FILE__) . "/");
 define( 'PTE_DOMAIN', "post-thumbnail-editor");
-define( 'PTE_VERSION', "2.0.0");
+define( 'PTE_VERSION', "2.0.1-beta");
 
 /*
  * Option Functionality
@@ -53,9 +53,8 @@ function pte_get_user_options(){
     if ( !is_array( $pte_options ) ){
         $pte_options = array();
     }
-    $defaults = array( 'pte_tb_width' => 750
-        , 'pte_tb_height' => 550
-        , 'pte_debug' => false
+    $defaults = array( 'pte_debug' => false
+        , 'pte_crop_save' => false
     );
 
     // WORDPRESS DEBUG overrides user setting...
@@ -63,12 +62,14 @@ function pte_get_user_options(){
 }
 
 function pte_get_site_options(){
-    $pte_site_options = get_option( 'pte-site-options' );
-    if ( !is_array( $pte_site_options ) ){
-        $pte_site_options = array();
-    }
-    $defaults = array( 'pte_hidden_sizes' => array() );
-    return array_merge( $defaults, $pte_site_options );
+	$pte_site_options = get_option( 'pte-site-options' );
+	if ( !is_array( $pte_site_options ) ){
+		$pte_site_options = array();
+	}
+	$defaults = array( 'pte_hidden_sizes' => array(),
+		'cache_buster' => true
+	);
+	return array_merge( $defaults, $pte_site_options );
 }
 
 function pte_get_options(){
@@ -87,6 +88,20 @@ function pte_get_options(){
     }
 
     return $pte_options;
+}
+
+function pte_update_user_options(){
+	require_once( PTE_PLUGINPATH . 'php/options.php' );
+	$options = pte_get_user_options();
+
+	if ( isset( $_REQUEST['pte_crop_save'] )
+			&& strtolower( $_REQUEST['pte_crop_save'] ) === "true" )
+		$options['pte_crop_save'] = true;
+	else
+		$options['pte_crop_save'] = false;
+
+	//print_r $options
+	update_option( pte_get_option_name(), $options );
 }
 
 /*
@@ -157,6 +172,9 @@ function pte_ajax(){
             $id = pte_check_id((int) $_GET['id']);
             print( json_encode( pte_get_all_alternate_size_information( $id ) ) );
             break;
+		case "change-options":
+				pte_update_user_options();
+            break;
    }
    die();
 }
@@ -169,7 +187,7 @@ function pte_media_row_actions($actions, $post, $detached){
     $options = pte_get_options();
 
     $pte_url = admin_url('upload.php') 
-        . "?page=pte-edit&post=" 
+        . "?page=pte-edit&pte-id=" 
         . $post->ID;
         //. "&TB_iframe=true&height={$options['pte_tb_height']}&width={$options['pte_tb_width']}";
 
@@ -261,7 +279,7 @@ add_action( 'load-options.php', 'pte_options' );
 add_action( 'load-media_page_pte-edit', 'pte_edit_setup' );
 function pte_edit_setup() {
    global $post;
-   $post_id = (int) $_GET['post'];
+   $post_id = (int) $_GET['pte-id'];
    if ( !isset( $post_id ) || !is_int( $post_id ) || !wp_attachment_is_image( $post_id ) ){
       //die("POST: $post_id IS_INT:" . is_int( $post_id ) . " ATTACHMENT: " . wp_attachment_is_image( $post_id ));
       wp_redirect( admin_url( "upload.php" ) );
@@ -277,6 +295,8 @@ function pte_edit_setup() {
          , 'no_c_selected' => __( 'No crop selected', PTE_DOMAIN )
          , 'crop_problems' => __( 'Cropping will likely result in skewed imagery', PTE_DOMAIN )
          , 'save_crop_problem' => __( 'There was a problem saving the crop...', PTE_DOMAIN )
+         , 'cropSave' => __( 'Crop and Save', PTE_DOMAIN )
+         , 'crop' => __( 'Crop', PTE_DOMAIN )
       )
    );
 }
@@ -289,4 +309,6 @@ function pte_edit_setup() {
 
 /** Test Settings **/
 //add_image_size( 'pte test 1', 100, 0 );
+//add_image_size( 'pte test 2', 100, 150, true );
+
 ?>

@@ -22,15 +22,10 @@ define [
 
          return
       trueSize: [
-         settings.getWindowVar('post_width')
-         settings.getWindowVar('post_height')
+         settings.width
+         settings.height
       ]
 
-   $("#pte-preview").Jcrop crop_options, ->
-      jcrop = this
-      jcrop?.release()
-      return
-   # Block until jcrop has been loaded
-   while jcrop is null
-      noop = null
+   jcrop = $.Jcrop "#pte-preview", crop_options
+   jcrop.release()
    return jcrop
