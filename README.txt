@@ -1,10 +1,11 @@
 === Post Thumbnail Editor ===
 Contributors: sewpafly
 Donate link: https://www.wepay.com/donate/34543
-Tags: post-thumbnail, post thumbnail, featured image, featured, editor, image, awesome
+Tags: post-thumbnail, post thumbnail, featured image, featured, editor, image, awesome, crop
 Requires at least: 3.5
-Tested up to: 3.5
+Tested up to: 3.6
 Stable tag: trunk
+License: GPLv2
 
 Fed up with the lack of automated tools to properly crop and scale post thumbnails? Maybe this plugin can help.
 
@@ -36,8 +37,8 @@ To meet the needs of themes where the post-thumbnails have random and capricious
 3. Using Post Thumbnail Editor Interface
 	1. Select the thumbnails you want to edit. If a thumbnail defines a specific aspect ratio it will be applied to the editor.  If you select thumbnails with more than 1 different aspect ratios, this feature is disabled.  Be careful or you might make some of your pictures look funny.
 	2. Select the cropped/scaled area, by clicking and dragging on the left-hand image. 
-	3. Click "Create Thumbnails" -- this button is only enabled if you have thumbnails selected and a crop area defined.
-	4. Thumbnail Preview: select all the thumbnails you want to keep and click "Okay, these look good".
+	3. Click the "Crop" button.
+	4. Use the save icon to save the pictures, or use the view tab to compare the old and new versions before you commit.
 4. It's possible that you might have to refresh the cache (ctrl+f5 on the page) to see changes, but they should be there.
 
 = Did you even test this? =
@@ -57,11 +58,30 @@ Using a version with [json_encode](http://www.php.net/manual/en/function.json-en
 1. Before/After
 2. To edit from Media Library click "Thumbnail" in the rollover options for the row.
 3. In the Edit subpage for media locate the box titled "Thumbnail Settings", and click the link to "Post Thumbnail Editor".
-4. Crop the image as you see fit and click "Create Thumbnails".
-5. Verify you want to keep the resized/recropped images by clicking "Okay, these look good..."
-6. Shortcut to edit the thumbnails from the picture metadata screen.
+4. Crop the image as you see fit, select the thumbnails you wish to change, and click "Crop".
+5. Save the resized/recropped images by clicking the save icon.
 
 == Changelog ==
+
+= 2.1.0 =
+* Crop Constraints are visually available: green is good and red means there will be upscaling
+* In the options panel change the size of the cropping image
+* Bug fix: 3.6 compatibility
+* Added thumbnail metadata to table
+
+= 2.0.1 =
+* IE fix with the jcrop api
+* Now go into the view mode after cropping
+* Added option to crop and save without verifying
+* Featured images now have link to launch the Post Thumbnail Editor
+* Updated coffee-script to 1.6.2
+* Updated French and Spanish translations
+* Made the cache buster an option
+
+= 2.0.0 =
+* New UI based off angularjs -- awesome framework btw -- same backend
+* In view tab, click the pictures to select (double-click switches to crop view).
+* Works on iPhone/iPad.
 
 = 1.0.7 =
 * Updated for Wordpress 3.5 (introduces backwards incompatible changes)
@@ -106,37 +126,5 @@ Using a version with [json_encode](http://www.php.net/manual/en/function.json-en
 
 == Upgrade Notice ==
 
-= 1.0.7 =
-Only for Wordpress 3.5+ (bug fixes)
-
-= 1.0.5 =
-Bugfix & added German translation
-
-= 1.0.4 =
-Bugfixes & portuguese translation
-
-= 1.0.3 =
-Fixed javascript problems & added italian translation
-
-= 1.0.2 =
-Problem with SVN commit of 1.0.1
-
-= 1.0.1 =
-Added translation support, french language, options menu and fixed incompatibility with other thickbox enabled plugins.
-
-= 1.0.0 =
-Now with more awesome.  Redesigned interface will challenge your perceptions of the universe.
-
-= 0.2.2 =
-Fixed version information
-Fixed plugin specific defines
-
-= 0.2.1 =
-Fixed PHP round() issue.
-
-= 0.2 =
-Change thumbnails aspect ratio (only works for medium/large. Will work for thumbnail if the crop checkbox isn't checked under Media Settings)
-
-= 0.1.1 =
-This version fixes a IE8/firefox javascript error.
-
+= 2.1.0 =
+Several new features and bug fixes since 2.0.1
