@@ -1,10 +1,10 @@
 <?php
 /*
 Plugin name: Post Thumbnail Editor
-Plugin URI: http://wordpress.org/extend/plugins/post-thumbnail-editor/
+Plugin URI: http://sewpafly.github.io/post-thumbnail-editor/
 Author: sewpafly
-Author URI: http://sewpafly.github.io/post-thumbnail-editor
-Version: 2.1.0
+Author URI: http://sewpafly.github.io/post-thumbnail-editor/
+Version: 2.2.0
 Description: Individually manage your post thumbnails
 
 LICENSE
@@ -34,7 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 define( 'PTE_PLUGINURL', plugins_url(basename( dirname(__FILE__))) . "/");
 define( 'PTE_PLUGINPATH', dirname(__FILE__) . "/");
 define( 'PTE_DOMAIN', "post-thumbnail-editor");
-define( 'PTE_VERSION', "2.1.0");
+define( 'PTE_VERSION', "2.2.0");
 
 /*
  * Option Functionality
@@ -54,6 +54,7 @@ function pte_get_user_options(){
 	}
 	$defaults = array( 'pte_debug' => false
 		, 'pte_crop_save' => false
+		, 'pte_thumbnail_bar' => 'vertical'
 		, 'pte_imgedit_max_size' => 600
 	);
 
@@ -94,11 +95,19 @@ function pte_update_user_options(){
 	require_once( PTE_PLUGINPATH . 'php/options.php' );
 	$options = pte_get_user_options();
 
-	if ( isset( $_REQUEST['pte_crop_save'] )
-		&& strtolower( $_REQUEST['pte_crop_save'] ) === "true" )
-		$options['pte_crop_save'] = true;
-	else
-		$options['pte_crop_save'] = false;
+	if ( isset( $_REQUEST['pte_crop_save'] ) ) {
+		if ( strtolower( $_REQUEST['pte_crop_save'] ) === "true" )
+			$options['pte_crop_save'] = true;
+		else
+			$options['pte_crop_save'] = false;
+	}
+
+	if ( isset( $_REQUEST['pte_thumbnail_bar'] ) ) {
+		if ( strtolower( $_REQUEST['pte_thumbnail_bar'] ) == 'vertical' )
+			$options['pte_thumbnail_bar'] = 'vertical';
+		else
+			$options['pte_thumbnail_bar'] = 'horizontal';
+	}
 
 	update_option( pte_get_option_name(), $options );
 }
@@ -131,6 +140,14 @@ add_action('dbx_post_advanced', 'pte_edit_form_hook_redirect');
 function pte_edit_form_hook_redirect(){
 	add_action('add_meta_boxes', 'pte_admin_media_scripts');
 }
+
+add_action( 'media_upload_library', 'pte_admin_media_scripts_editor' );
+add_action( 'media_upload_gallery', 'pte_admin_media_scripts_editor' );
+add_action( 'media_upload_image', 'pte_admin_media_scripts_editor' );
+function pte_admin_media_scripts_editor(){
+	pte_admin_media_scripts('attachment');
+}
+
 function pte_admin_media_scripts($post_type){
 	$options = pte_get_options();
 	wp_enqueue_script( 'pte'
@@ -145,15 +162,15 @@ function pte_admin_media_scripts($post_type){
 		)
 	);
 	if ($post_type == "attachment") {
-		add_action( 'admin_print_footer_scripts', 'pte_enable_admin_js', 100);
+		add_action( 'admin_print_footer_scripts', 'pte_enable_editor_js', 100);
 	}
 	else {
 		add_action( 'admin_print_footer_scripts', 'pte_enable_media_js', 100);
 	}
 }
 
-function pte_enable_admin_js(){
-	injectCoffeeScript( PTE_PLUGINPATH . "js/snippets/admin.coffee" );
+function pte_enable_editor_js(){
+	injectCoffeeScript( PTE_PLUGINPATH . "js/snippets/editor.coffee" );
 }
 
 function pte_enable_media_js(){
@@ -199,9 +216,6 @@ function pte_ajax(){
 
 	switch ($_GET['pte-action'])
 	{
-	case "test":
-		pte_test();
-		break;
 	case "resize-images":
 		pte_resize_images();
 		break;
@@ -212,8 +226,9 @@ function pte_ajax(){
 		pte_delete_images();
 		break;
 	case "get-thumbnail-info":
-		$id = pte_check_id((int) $_GET['id']);
-		print( json_encode( pte_get_all_alternate_size_information( $id ) ) );
+		$id = (int) $_GET['id'];
+		if ( pte_check_id( $id ) )
+			print( json_encode( pte_get_all_alternate_size_information( $id ) ) );
 		break;
 	case "change-options":
 		pte_update_user_options();
@@ -222,12 +237,30 @@ function pte_ajax(){
 	die();
 }
 
+/**
+ * Perform the capability check
+ *
+ * @param $id References the post that the user needs to have permission to edit
+ * @returns boolean true if the current user has permission else false
+ */
+function pte_check_id( $id ) {
+	if ( !$post =& get_post( $id ) ) {
+		return false;
+	}
+	if ( current_user_can( 'edit_post', $id )
+		|| current_user_can( 'pte-edit', $id ) )
+   	{
+		return apply_filters( 'pte-capability-check', true, $id );
+	}
+	return apply_filters( 'pte-capability-check', false, $id );
+}
+
 /* Adds the Thumbnail option to the media library list */
 add_filter('media_row_actions', 'pte_media_row_actions', 10, 3); // priority: 10, args: 3
 
 function pte_media_row_actions($actions, $post, $detached){
 	// Add capability check
-	if ( !current_user_can( 'edit_post', $post->ID ) ){
+	if ( !pte_check_id( $post->ID ) ) {
 		return $actions;
 	}
 	$options = pte_get_options();
@@ -268,7 +301,7 @@ add_action( 'admin_menu', 'pte_admin_menu' );
  * code is in admin-header.php.
  */
 function pte_admin_menu(){
-	add_options_page( __('Post Thumbnail Editor', PTE_DOMAIN) . "-title",
+	add_options_page( __('Post Thumbnail Editor', PTE_DOMAIN),
 		__('Post Thumbnail Editor', PTE_DOMAIN),
 		'edit_posts',
 		'pte',
@@ -307,7 +340,10 @@ add_action( 'load-media_page_pte-edit', 'pte_edit_setup' );
 function pte_edit_setup() {
 	global $post, $title;
 	$post_id = (int) $_GET['pte-id'];
-	if ( !isset( $post_id ) || !is_int( $post_id ) || !wp_attachment_is_image( $post_id ) ){
+	if ( !isset( $post_id ) 
+			|| !is_int( $post_id )
+			|| !wp_attachment_is_image( $post_id )
+			|| !pte_check_id( $post_id ) ) {
 		//die("POST: $post_id IS_INT:" . is_int( $post_id ) . " ATTACHMENT: " . wp_attachment_is_image( $post_id ));
 		wp_redirect( admin_url( "upload.php" ) );
 		exit();
@@ -335,9 +371,3 @@ load_plugin_textdomain( PTE_DOMAIN
 	, false
 	, basename( PTE_PLUGINPATH ) . DIRECTORY_SEPARATOR . "i18n" );
 
-
-/** Test Settings **/
-//add_image_size( 'pte test 1', 100, 0 );
-//add_image_size( 'pte test 2', 100, 150, true );
-
-?>
