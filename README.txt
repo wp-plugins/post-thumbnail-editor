@@ -3,7 +3,7 @@ Contributors: sewpafly
 Donate link: http://sewpafly.github.io/post-thumbnail-editor/#toc_donations
 Tags: post-thumbnail, post thumbnail, featured image, featured, editor, image, awesome, crop
 Requires at least: 3.5
-Tested up to: 3.6
+Tested up to: 3.8.x
 Stable tag: trunk
 License: GPLv2
 
@@ -12,17 +12,6 @@ Fed up with the lack of automated tools to properly crop and scale post thumbnai
 == Description ==
 
 To meet the needs of themes where the post-thumbnails have random and capricious sizes (which causes wordpress to crop images simply from the middle (either chopping off the top and bottom or chopping off the sides), this plugin attempts to give the users an interface to manually fix those thumbnail and random images.
-
-= Translations =
-
-My thanks to the following individuals for their help in translating PTE:
-
-* French: [Li-An](https://github.com/Li-An)
-* German: [Christian Wenzl](http://www.christian-wenzl.de)
-* Italian: [MacItaly](http://wordpress.org/support/profile/macitaly)
-* Polish: [Florek41](https://github.com/florek41)
-* Portuguese: [Leo Caseiro](https://github.com/leocaseiro)
-* Spanish: [Samuel Aguilera](https://github.com/samuelaguilera)
 
 == Installation ==
 
@@ -85,6 +74,21 @@ If you want to post a problem on the [support forums][wp] or at [github][gh] ple
 5. Save the resized/recropped images by clicking the save icon.
 
 == Changelog ==
+
+= 2.3.0 =
+* Updated libraries
+* (re-)Added Thickbox/Media Library Integration (#65)
+* Set jpeg compression dynamically (#63)
+* Add fit crop to thumbnail option (enabled by default), can be overridden in the "Options" menu #78
+* Various bug fixes
+
+= 2.2.2 =
+* Unreleased version
+* Updated libraries
+* Added spinner to show loading
+* Polish translation
+* fix #76: PHP Strict Standards Error
+* Save and crop stays in crop view
 
 = 2.2.1 =
 * fixed onLoad problem
@@ -163,5 +167,5 @@ If you want to post a problem on the [support forums][wp] or at [github][gh] ple
 
 == Upgrade Notice ==
 
-= 2.2.1 =
-Several new features and bug fixes since 2.1.0
+= 2.3.0 =
+Several new features and bug fixes since 2.2.1
