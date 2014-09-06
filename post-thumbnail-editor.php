@@ -4,7 +4,7 @@ Plugin name: Post Thumbnail Editor
 Plugin URI: http://sewpafly.github.io/post-thumbnail-editor/
 Author: sewpafly
 Author URI: http://sewpafly.github.io/post-thumbnail-editor/
-Version: 2.4.0
+Version: 2.4.1
 Description: Individually manage your post thumbnails
 
 LICENSE
@@ -34,7 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 define( 'PTE_PLUGINURL', plugins_url(basename( dirname(__FILE__))) . "/");
 define( 'PTE_PLUGINPATH', dirname(__FILE__) . "/");
 define( 'PTE_DOMAIN', "post-thumbnail-editor");
-define( 'PTE_VERSION', "2.4.0");
+define( 'PTE_VERSION', "2.4.1");
 
 // TODO:
 // * Find the best place for the require log (only when it's really needed, create an init function?)
@@ -306,6 +306,35 @@ function pte_check_id( $id ) {
 		return apply_filters( 'pte-capability-check', true, $id );
 	}
 	return apply_filters( 'pte-capability-check', false, $id );
+}
+
+/** 
+ * Upload.php (the media library page) fires:
+ * - 'load-upload.php' (wp-admin/admin.php)
+ * - GRID VIEW:
+ *   + 'wp_enqueue_media' (upload.php:wp-includes/media.php:wp_enqueue_media) 
+ * - LIST VIEW:
+ *   + 'media_row_actions' (filter)(class-wp-media-list-table.php)
+ */
+add_action('load-upload.php', 'pte_media_library_boot');
+function pte_media_library_boot() { 
+    add_action('wp_enqueue_media', 'pte_load_media_library');
+}
+function pte_load_media_library() {
+    global $mode; 
+    if ('grid' !== $mode) return;
+	wp_enqueue_script( 'pte'
+		, PTE_PLUGINURL . 'js/snippets/pte_enable_media.js'
+		, null
+		, PTE_VERSION
+		, true
+	);
+	wp_localize_script('pte'
+		, 'pteL10n'
+		, array('PTE' => __('Post Thumbnail Editor', PTE_DOMAIN)
+			, 'url' => pte_url( "<%= id %>", true )
+		)
+	);
 }
 
 /* Adds the Thumbnail option to the media library list */
