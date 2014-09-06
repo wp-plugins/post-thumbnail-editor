@@ -3,7 +3,7 @@ Contributors: sewpafly
 Donate link: http://sewpafly.github.io/post-thumbnail-editor/#toc_donations
 Tags: post-thumbnail, post thumbnail, featured image, featured, editor, image, awesome, crop
 Requires at least: 3.5
-Tested up to: 4.0.x
+Tested up to: 4.0
 Stable tag: trunk
 License: GPLv2
 
