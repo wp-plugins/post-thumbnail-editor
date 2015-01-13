@@ -17,6 +17,8 @@ function u( $path ){
    var post_id     = <?php echo $post->ID; ?> 
      , post_width  = <?php echo $meta['width']; ?> 
      , post_height = <?php echo $meta['height']; ?> 
+     , pte_nonce   = "<?php echo wp_create_nonce("pte-resize-{$post->ID}"); ?>"
+     , pte_options_nonce = "<?php echo wp_create_nonce("pte-options"); ?>"
      , pteI18n     = <?php echo json_encode( 
 			  array( 'no_t_selected' => __( 'No thumbnails selected', PTE_DOMAIN )
 			  , 'no_c_selected' => __( 'No crop selected', PTE_DOMAIN )
@@ -281,26 +283,30 @@ function u( $path ){
 </div>
 <?php
 
-			   function evaluate_attributes( $array ) {
-				   foreach ( $array as $key => $value ) {
-					   $attributes[] = "$key=\"$value\"";
-				   }
-				   return $attributes;
-			   }
+function enqueue_script_filter($tag, $handle) {
+	if ('pte-require' !== $handle)
+		return $tag;
+	return str_replace(' src', ' data-main="' . PTE_PLUGINURL . 'js/main" src', $tag);
+}
 
-			   $script_tag = "<script %s></script>";
-			   $options = pte_get_options();
-			   if ( $options['pte_debug'] ) {
-				   $script_attributes = evaluate_attributes( array(
-					   'src' => PTE_PLUGINURL . "apps/requirejs/require.js",
-					   'data-main' => PTE_PLUGINURL . 'js/main'
-				   ) );
-			   }
-			   else {
-				   $script_attributes = evaluate_attributes( array(
-					   'src' => PTE_PLUGINURL . "js-build/main.js"
-				   ) );
-			   }
+$options = pte_get_options();
 
-
-			   echo sprintf( $script_tag, join( $script_attributes, " " ) );
+if ( $options['pte_debug'] ) {
+	wp_enqueue_script(
+		'pte-require', 
+		PTE_PLUGINURL . "apps/requirejs/require.js",
+		null, 
+		PTE_VERSION, 
+		true
+	);
+	add_filter('script_loader_tag', 'enqueue_script_filter', 10, 2);
+}
+else {
+	wp_enqueue_script(
+		'pte-min-js', 
+		PTE_PLUGINURL . "js-build/main.js",
+		null, 
+		PTE_VERSION, 
+		true
+	);
+}
